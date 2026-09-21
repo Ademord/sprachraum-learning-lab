@@ -8,7 +8,9 @@ For development, use Node 22.13 or later, run `npm ci`, then `npm run dev`. The 
 
 ## Teacher feedback and shared sessions
 
-Teacher view supports native word/phrase selection in readings, referenced texts, dialogues, vocabulary examples, patterns, expressions and tone alternatives. A selected range becomes a soft-red pronunciation mark with an optional note. Learner view hides marks until Show teacher marks or Review is selected. Practice ticks and teacher notes are saved with the session. The lesson title stays compact; its goals appear on hover, keyboard focus or a tap.
+Teacher view opens in **Mark words** mode. Click or tap a word to mark it immediately, or drag across a phrase; partial drags snap to complete words. Touch selection handles also offer an explicit **Mark selected phrase** action. Clicking an existing mark opens its note alongside the text. The non-modal rail shows one mark, sentence context, optional feedback, previous/next, all marks and undo. **Read** returns to lesson tasks. Keyboard users can Tab into the text, move with arrows, extend a phrase with Shift + arrows and mark with Enter. Ctrl/Cmd + Z undoes marking outside text fields.
+
+Learners switch from **Read** to **Review pronunciation** when ready. The same rail shows feedback and practice progress while keeping the passage usable. On narrow screens it becomes a bounded bottom panel. All marks, notes and practice state retain the existing synchronization and JSON backup format. The lesson title stays compact; its goals appear on hover, keyboard focus or a tap.
 
 With my teacher creates a server-backed room and a private teacher invitation. The teacher must also have access to the hosted Site. One signed-in teacher can claim an invitation; the learner can replace it or end sharing. The server checks identity and role on every operation. Learner and teacher navigate independently, with an optional Follow learner control. The original local lesson remains available.
 
@@ -43,6 +45,8 @@ The local sibling folder `../learning-source-analysis/` contains original PDFs, 
 ## Verification
 
 Revision 4: `npm test` includes the earlier checks plus full backup round trips, real DOM Range/Selection offset checks using jsdom, exact repeated-word/Unicode anchors, hidden/revealed marks, separate restore, two isolated DOM clients sharing the actual API with a SQLite D1 adapter, offline pending-state reload, concurrent edits, idempotent retry, preserved/resolved conflicts, invitation revocation, and request-size-bounded queue draining. UI selection was checked through jsdom, not a native browser or visual screenshot test. The server build is also checked. Production authorization uses the Site's forwarded authenticated-user headers; tests use synthetic identities.
+
+The pronunciation redesign adds DOM regression checks for direct marking, phrase snapping, duplicate focus, undo, touch scrolling and native selections, keyboard phrase marking across paragraphs, focus retention, read/review transitions, remote deletion and stale selections after navigation. Native mobile keyboard and viewport behavior has not been browser-tested.
 
 Revision 3: `node scripts/test-import.mjs` covers all three built-in export/import round trips and 52 imported page renderings, invalid packets, unsafe content, persistence and reload, revision drafts, duplicate/version isolation, paste-preview-import, clipboard success/fallback, quota failures, and damaged storage. `node scripts/validate-content.mjs` still passes the original content and draft checks. These are runtime checks with a DOM stub, not a browser layout or permission test. No new browser UI testing was performed for this revision.
 

@@ -10,7 +10,7 @@
     "build": "node scripts/build-server.mjs",
     "dev": "node scripts/dev-server.mjs",
     "db:generate": "drizzle-kit generate",
-    "test": "node scripts/validate-content.mjs && node scripts/test-import.mjs && node scripts/test-collaboration.mjs"
+    "test": "node scripts/validate-content.mjs && node scripts/test-import.mjs && node scripts/test-collaboration.mjs && node scripts/test-pronunciation.mjs"
   },
   "devDependencies": {
     "drizzle-kit": "0.31.10",

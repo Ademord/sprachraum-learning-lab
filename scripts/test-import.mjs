@@ -15,7 +15,7 @@ function boot(stored = new Map(), { quota = false, clipboard = true } = {}) {
     localStorage: { getItem: k => stored.get(k), setItem(k, v) { if (quota) throw new Error('quota'); stored.set(k, v); } },
     setTimeout: () => 0, clearTimeout() {}, addEventListener() {}, AbortController, console };
   context.window = context; vm.createContext(context);
-  for (const file of ['lessons.js', 'advanced-lessons.js', 'lesson-format.js', 'session-format.js', 'lesson-library.js', 'lesson-authoring.js', 'room-client.js', 'collaboration.js', 'app.js']) vm.runInContext(fs.readFileSync(`dist/${file}`, 'utf8'), context, { filename: file });
+  for (const file of ['lessons.js', 'advanced-lessons.js', 'lesson-format.js', 'session-format.js', 'lesson-library.js', 'lesson-authoring.js', 'room-client.js', 'pronunciation.js', 'collaboration.js', 'app.js']) vm.runInContext(fs.readFileSync(`dist/${file}`, 'utf8')+(file==='pronunciation.js'?'\nPRONUNCIATION.mount=()=>{};':''), context, { filename: file });
   return { context, stored, elements, downloads, copied, tools, run: code => vm.runInContext(code, context), element };
 }
 const a = boot();
