@@ -110,8 +110,10 @@
     insist(isObject(op) && uid(op.id) && typeof op.field === 'string' && Object.keys(op).every(k => ['id', 'field', 'key', 'before', 'value'].includes(k)), 'Invalid operation.');
     const teacherField = op.field === 'annotations' || op.field === 'teacherNotes';
     insist(role === 'owner' || (role === 'teacher' ? teacherField : role === 'learner' && !teacherField), 'This role cannot edit that field.');
-    const next = clone(snapshot); let previous;
-    if (op.field === 'practiced' && !next.annotations.some(a => a.id === op.key)) { delete next.practiced[op.key]; return next; }
+    // Pending edits can number in the hundreds after a disconnection. Copy only
+    // the field being changed; retain immutable references to unrelated fields.
+    const next = { ...snapshot }; let previous;
+    if (op.field === 'practiced' && !next.annotations.some(a => a.id === op.key)) { next.practiced = { ...snapshot.practiced }; delete next.practiced[op.key]; return next; }
     if (op.field === 'annotations') { insist(uid(op.key), 'Invalid mark ID.'); previous = next.annotations.find(a => a.id === op.key) || null; }
     else if (mapped.includes(op.field)) { insist(typeof op.key === 'string' && op.key.length <= 300 && safeKey(op.key), 'Invalid field key.'); previous = next[op.field][op.key] ?? null; }
     else { insist(scalar.includes(op.field) && op.key === undefined, 'Unsupported operation field.'); previous = next[op.field]; }
@@ -119,8 +121,8 @@
     if (op.field === 'annotations') {
       insist(op.value === null || isObject(op.value) && op.value.id === op.key, 'Mark ID mismatch.');
       next.annotations = next.annotations.filter(a => a.id !== op.key);
-      if (op.value !== null) next.annotations.push(clone(op.value)); else delete next.practiced[op.key];
-    } else if (mapped.includes(op.field)) { if (op.value === null) delete next[op.field][op.key]; else next[op.field][op.key] = clone(op.value); }
+      if (op.value !== null) next.annotations.push(clone(op.value)); else { next.practiced = { ...snapshot.practiced }; delete next.practiced[op.key]; }
+    } else if (mapped.includes(op.field)) { next[op.field] = { ...snapshot[op.field] }; if (op.value === null) delete next[op.field][op.key]; else next[op.field][op.key] = clone(op.value); }
     else next[op.field] = clone(op.value);
     return next;
   }

@@ -2,7 +2,7 @@
 (function (root) {
   'use strict';
   const IO = root.SESSION_IO;
-  let client = null, applying = false, captureTimer, status = { text: '', kind: '' }, invitation = null, follow = false, navigationEpoch = 0, refreshPending = false;
+  let client = null, applying = false, captureDirty = false, captureTimer, status = { text: '', kind: '' }, invitation = null, follow = false, navigationEpoch = 0, refreshPending = false;
   const uuid = () => crypto.randomUUID();
   const pendingInviteKey = 'sprachraum.pending-invitation.v1';
   let invitationSaved = true;
@@ -71,12 +71,12 @@
   }
   const token = () => [...crypto.getRandomValues(new Uint8Array(32))].map(b => b.toString(16).padStart(2, '0')).join('');
   function saveLocal() { applying = true; try { persist(); } finally { applying = false; } }
-  function capture() { if (client && state && state.live?.id === client.id && !applying) { try { client.capture(backup().session); } catch (e) { setStatus({ text: e.message, kind: 'blocked' }); } } }
-  function changed() { if (!applying && client) { clearTimeout(captureTimer); captureTimer = setTimeout(capture, 350); } }
+  function capture() { if (captureDirty && client && state && state.live?.id === client.id && !applying) { try { client.capture(backup().session); captureDirty = false; clearTimeout(captureTimer); } catch (e) { setStatus({ text: e.message, kind: 'blocked' }); } } }
+  function changed() { if (!applying && client && state?.live?.id === client.id) { captureDirty = true; clearTimeout(captureTimer); captureTimer = setTimeout(capture, 350); } }
   function setStatus(next) {
     if (!storageOK && next.pending) next = { ...next, text: next.text + ' Browser storage is unavailable; keep this tab open or export a backup.' };
     status = next;
-    document.querySelectorAll('[data-sync-status]').forEach(el => { el.textContent = next.text; el.className = 'sync-state ' + (next.kind || ''); });
+    document.querySelectorAll('[data-sync-status]').forEach(el => { if (el.textContent !== next.text) el.textContent = next.text; const name = 'sync-state ' + (next.kind || ''); if (el.className !== name) el.className = name; });
     if (drawer === 'live' && (next.kind === 'conflict' || next.kind === 'blocked')) openDrawer('live');
   }
   function refreshViews() {
@@ -85,7 +85,7 @@
     render(); if (panel) openDrawer(panel); if (typeof root.scrollTo === 'function') root.scrollTo(0, y);
   }
   function attach(data, localState, pending = []) {
-    client?.stop(); clearTimeout(captureTimer);
+    client?.stop(); clearTimeout(captureTimer); captureDirty = false;
     setStatus({ text: 'Connecting…', kind: 'pending' });
     const activeId = localState.id, source = sourceFor(localState);
     client = new RoomClient({ id: data.id, role: data.role === 'teacher' ? 'teacher' : 'owner', revision: data.revision, session: data.session, pending,
@@ -94,6 +94,7 @@
       onSnapshot: (snapshot, remote) => {
         if (state?.id !== activeId) return;
         const previousUI = JSON.stringify([state.tones,state.checks,state.reveals,state.saved,state.teacherNotes]);
+        const previousMarks = JSON.stringify([state.annotations,state.practiced,state.teacherNotes]);
         const localPosition = { tab: state.tab, pages: state.pages, presentation: state.presentation };
         const translated = IO.importState(snapshot, source.runtime, source.packet, state.id, state.lesson);
         const next = { ...translated, live: state.live, pendingEdits: client.pending };
@@ -104,7 +105,7 @@
         if (previousUI !== JSON.stringify([state.tones,state.checks,state.reveals,state.saved,state.teacherNotes])) refreshPending = true;
         if (view === 'session') {
           if (navigated) render(); else {
-            paintMarks();
+            if (previousMarks !== JSON.stringify([state.annotations,state.practiced,state.teacherNotes])) paintMarks();
             document.querySelectorAll('[data-draft]').forEach(el => { if (document.activeElement !== el && el.value !== (state.drafts[el.dataset.draft] || '')) el.value = state.drafts[el.dataset.draft] || ''; });
             refreshViews();
           }
@@ -113,7 +114,7 @@
     });
     // Flush local changes immediately before accepting a new remote snapshot.
     const accept = client.accept.bind(client);
-    client.accept = value => { if (state?.id === activeId) capture(); accept(value); };
+    client.accept = value => { if (value.session && state?.id === activeId) capture(); accept(value); };
     client.onSnapshot(IO.clone(client.baseline), data);
     client.start();
   }
@@ -165,7 +166,7 @@
       target.querySelectorAll('[data-open-room]').forEach(el => el.onclick = () => openRoom(el.dataset.openRoom));
     } catch (e) { if (drawer === 'live') { const target = document.querySelector('[data-cloud-rooms]'); if (target) target.innerHTML = e.status === 401 ? signInHTML() : '<p class="hint">' + esc(e.message) + '</p>'; } }
   }
-  function beforeLeave() { capture(); navigationEpoch++; clearTimeout(captureTimer); client?.stop(); client = null; PRONUNCIATION.reset(); }
+  function beforeLeave() { capture(); navigationEpoch++; clearTimeout(captureTimer); client?.stop(); client = null; captureDirty = false; PRONUNCIATION.reset(); }
   function bind() {
     const all = (sel, fn) => document.querySelectorAll(sel).forEach(el => el.onclick = () => fn(el));
     const heading=document.querySelector('[data-heading]'),toggle=document.querySelector('[data-heading-toggle]');

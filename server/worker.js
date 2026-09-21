@@ -50,7 +50,18 @@ export async function handleApi(request, env) {
   }
   const match = path.match(/^\/api\/rooms\/([a-zA-Z0-9-]{8,100})(?:\/(join|ops|close|invite))?$/);
   if (!match) fail(404, 'Unknown session endpoint.');
-  const [, id, action] = match; let room = await roomById(db, id);
+  const [, id, action] = match;
+  if (!action && request.method === 'GET') {
+    // Idle polls need membership and revision, not the lesson/snapshot blobs.
+    const metadata = await db.prepare('SELECT id, learner_id, teacher_id, revision, closed FROM lesson_rooms WHERE id = ?').bind(id).first();
+    membership(metadata, user);
+    const full = url.searchParams.get('full') === '1';
+    if (!full && url.searchParams.has('since') && Number(url.searchParams.get('since')) === metadata.revision) return json({ unchanged: true, revision: metadata.revision, teacherJoined: !!metadata.teacher_id, closed: !!metadata.closed });
+    const current = await db.prepare(full ? 'SELECT * FROM lesson_rooms WHERE id = ?' : 'SELECT id, learner_id, teacher_id, revision, closed, snapshot FROM lesson_rooms WHERE id = ?').bind(id).first();
+    // Recheck after loading: an invitation may have been revoked in between.
+    return json(responseRoom(current, membership(current, user), full));
+  }
+  let room = await roomById(db, id);
   if (!room) fail(404, 'Shared session not found.');
   if (action === 'join' && request.method === 'POST') {
     const data = await body(request);
@@ -63,10 +74,6 @@ export async function handleApi(request, env) {
     return json(responseRoom(room, 'teacher', true));
   }
   const role = membership(room, user);
-  if (!action && request.method === 'GET') {
-    if (url.searchParams.has('since') && Number(url.searchParams.get('since')) === room.revision) return json({ unchanged: true, revision: room.revision, teacherJoined: !!room.teacher_id, closed: !!room.closed });
-    return json(responseRoom(room, role, url.searchParams.get('full') === '1'));
-  }
   if (action === 'invite' && request.method === 'POST') {
     if (role !== 'owner' || room.closed) fail(403, 'Only the learner can renew the teacher invitation.');
     const data = await body(request);
@@ -103,7 +110,8 @@ export async function handleApi(request, env) {
       }
       if (!done) return json({ error: 'Several edits arrived together. Retrying is safe.', acknowledged }, 503);
     }
-    return json({ acknowledged, ...responseRoom(await roomById(db, id), role) });
+    const current = await roomById(db, id);
+    return json({ acknowledged, ...responseRoom(current, membership(current, user)) });
   }
   fail(405, 'This action is not supported.');
 }

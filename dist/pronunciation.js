@@ -4,6 +4,8 @@
   const IO = root.SESSION_IO;
   let context = '', marking = false, panel = false, active = null, lastPage = '', undo = null;
   let pointer = null, dragging = false, suppressClick = false, keyboardStart = null, hovered = null;
+  const rendered = new WeakMap();
+  let paintPending = false, positionFrame = null;
   const teacher = () => state?.presentation?.role === 'teacher';
   const visible = () => teacher() || !!state?.presentation?.showMarks;
   const words = value => [...value.matchAll(/[\p{L}\p{M}\p{N}]+(?:[’'–-][\p{L}\p{M}\p{N}]+)*/gu)].map(m => ({ start: m.index, end: m.index + m[0].length, text: m[0] }));
@@ -40,23 +42,29 @@
     if (!state || view !== 'session') return;
     ensure();
     // Never replace text nodes under an active pointer selection.
-    if (dragging || root.getSelection?.()?.toString()) return;
+    if (dragging || root.getSelection?.()?.toString()) { paintPending = true; return; }
+    paintPending = false;
     const { packet, runtime } = COLLAB.sourceFor(); const ids = IO.maps(runtime, packet).toPortable;
     const focus = document.activeElement?.closest('[data-pron-word]');
     const focused = focus && { page: focus.closest('[data-annotatable]').dataset.pageId, block: focus.closest('[data-annotatable]').dataset.block, start: focus.dataset.start };
     document.querySelectorAll('[data-annotatable]').forEach(el => {
       const content = IO.block(packet, ids.get(el.dataset.pageId), el.dataset.block, true);
       if (content === null) return;
-      const output = html(content, el.dataset.pageId, el.dataset.block);
-      if (el.innerHTML !== output) el.innerHTML = output;
-      el.querySelectorAll('[data-word]').forEach(word => word.onclick = () => openDrawer('word', word.dataset.word));
+      const marks = visible() ? state.annotations.filter(a => a.pageId === el.dataset.pageId && a.block === el.dataset.block).map(a => [a.id, a.start, a.end, a.quote, !!state.practiced[a.id], a.id === active && panel]) : [];
+      const signature = JSON.stringify([content, teacher() && marking, marks]);
+      if (rendered.get(el) !== signature) {
+        // Compare authored inputs, never browser-normalized HTML or mutable tabindex.
+        el.innerHTML = html(content, el.dataset.pageId, el.dataset.block);
+        rendered.set(el, signature);
+        el.querySelectorAll('[data-word]').forEach(word => word.onclick = () => openDrawer('word', word.dataset.word));
+      }
     });
     const targets = [...document.querySelectorAll('[data-pron-word]')];
-    targets.forEach(el => el.tabIndex = -1);
     const target = focused && targets.find(el => el.dataset.start === focused.start && el.closest('[data-annotatable]').dataset.pageId === focused.page && el.closest('[data-annotatable]').dataset.block === focused.block);
-    if (targets.length) (target || targets[0]).tabIndex = 0;
+    const tabStop = target || targets.find(el => el.tabIndex === 0) || targets[0];
+    targets.forEach(el => { const value = el === tabStop ? 0 : -1; if (el.tabIndex !== value) el.tabIndex = value; });
     if (target && focus !== target) target.focus({ preventScroll: true });
-    document.querySelectorAll('[data-mark-count]').forEach(el => el.textContent = state.annotations.length);
+    document.querySelectorAll('[data-mark-count]').forEach(el => { const count = String(state.annotations.length); if (el.textContent !== count) el.textContent = count; });
     refresh(); positionRemove();
   }
   function anchor(element, start, end) {
@@ -129,9 +137,11 @@
   }
   function refresh(force = false) {
     const rail = document.querySelector('[data-pron-rail]'); if (!rail) return;
-    document.querySelector('.activity').hidden = panel;
-    rail.hidden = !panel; document.querySelector('.canvas')?.classList.toggle('pronunciation-open', panel);
-    document.querySelectorAll('[data-pron-mode]').forEach(el => el.setAttribute('aria-pressed', String(teacher() ? marking : panel)));
+    const activity = document.querySelector('.activity'), canvas = document.querySelector('.canvas');
+    if (activity.hidden !== panel) activity.hidden = panel;
+    if (rail.hidden !== !panel) rail.hidden = !panel;
+    if (canvas && canvas.classList.contains('pronunciation-open') !== panel) canvas.classList.toggle('pronunciation-open', panel);
+    document.querySelectorAll('[data-pron-mode]').forEach(el => { const value = String(teacher() ? marking : panel); if (el.getAttribute('aria-pressed') !== value) el.setAttribute('aria-pressed', value); });
     if (!panel) return;
     if (!force && rail.contains(document.activeElement) && document.activeElement.matches('textarea')) {
       if (!active || state.annotations.some(a => a.id === active)) return;
@@ -205,7 +215,7 @@
     const id = hovered;
     const mark = id && [...document.querySelectorAll('.material [data-mark]')].find(el => el.dataset.mark === id);
     const rect = mark?.getClientRects()[0];
-    if (!state || view !== 'session' || !teacher() || drawer || dragging || root.getSelection?.()?.toString() || !rect || !rect.width || rect.bottom < 20 || rect.top > root.innerHeight - 20 || mark.closest('details:not([open])')) { if (button) button.hidden = true; return; }
+    if (!state || view !== 'session' || !teacher() || drawer || dragging || root.getSelection?.()?.toString() || !rect || !rect.width || rect.bottom < 20 || rect.top > root.innerHeight - 20 || mark.closest('details:not([open])')) { if (button && !button.hidden) button.hidden = true; return; }
     if (!button) {
       button = document.createElement('button'); button.className = 'pron-remove-floating'; button.type = 'button'; button.dataset.pronRemoveFloating = '';
       button.textContent = '×';
@@ -219,6 +229,10 @@
     button.title = 'Remove mark';
     button.style.left = Math.max(4, Math.min(root.innerWidth - 30, rect.right - 9)) + 'px';
     button.style.top = Math.max(4, rect.top - 15) + 'px';
+  }
+  function schedulePositionRemove() {
+    if (positionFrame !== null) return;
+    positionFrame = root.requestAnimationFrame(() => { positionFrame = null; positionRemove(); });
   }
   function bindRail(rail) {
     const on = (selector, fn) => rail.querySelectorAll(selector).forEach(el => el.onclick = () => fn(el));
@@ -235,16 +249,18 @@
   function updateSelection() {
     const box = document.querySelector('[data-pron-selection]');
     if (!box || !teacher() || !marking || dragging || drawer) return;
-    const anchors = selectionAnchors(); box.hidden = !anchors.length;
-    if (!anchors.length) { box.innerHTML = ''; return; }
-    box.innerHTML = `<p lang="de">${esc(anchors.map(a => a.quote).join(' … '))}</p><button data-pron-add-selection>Mark selected phrase</button>`;
+    const anchors = selectionAnchors(); if (box.hidden !== !anchors.length) box.hidden = !anchors.length;
+    if (!anchors.length) { if (box.childNodes.length) box.replaceChildren(); box._selectionHTML = ''; return; }
+    const output = `<p lang="de">${esc(anchors.map(a => a.quote).join(' … '))}</p><button data-pron-add-selection>Mark selected phrase</button>`;
+    if (box._selectionHTML !== output) { box.innerHTML = output; box._selectionHTML = output; }
+    // Equal quotes can refer to different occurrences. Always bind current anchors.
     const button = box.querySelector('button'); button.onpointerdown = e => e.preventDefault(); button.onclick = () => { suppressClick = false; add(anchors); };
   }
   function init() {
     document.addEventListener('pointerdown', e => { pointer = null; dragging = false; if ((e.button === undefined || e.button === 0) && e.target.closest('[data-annotatable]') && teacher() && marking && !drawer) { pointer = { x: e.clientX, y: e.clientY, type: e.pointerType }; dragging = true; suppressClick = false; positionRemove(); } });
     document.addEventListener('pointerover', e => { const mark = e.target.closest('.material [data-mark]'); if (mark && teacher() && e.pointerType !== 'touch') { hovered = mark.dataset.mark; positionRemove(); } });
     document.addEventListener('pointerout', e => { if (e.target.closest('.material [data-mark]') && !e.relatedTarget?.closest?.('[data-pron-remove-floating],.material [data-mark]')) { hovered = null; positionRemove(); } });
-    root.addEventListener('scroll', positionRemove, true); root.addEventListener('resize', positionRemove);
+    root.addEventListener('scroll', schedulePositionRemove, true); root.addEventListener('resize', schedulePositionRemove);
     document.addEventListener('pointerup', e => {
       const startedInText = !!pointer;
       const moved = pointer && (Math.abs(e.clientX - pointer.x) > 7 || Math.abs(e.clientY - pointer.y) > 7);
@@ -256,9 +272,11 @@
         else if (anchors.length && !touchScroll) { suppressClick = true; add(anchors); }
         else if (moved) suppressClick = true;
       }
+      // A click follows pointerup. Keep its target attached until it is dispatched.
+      if (paintPending && !root.getSelection?.()?.toString()) root.requestAnimationFrame(() => { if (paintPending) paint(); });
     });
-    document.addEventListener('pointercancel', () => { dragging = false; pointer = null; suppressClick = true; });
-    document.addEventListener('selectionchange', () => { updateSelection(); positionRemove(); if (!dragging && !root.getSelection?.()?.toString()) paint(); });
+    document.addEventListener('pointercancel', () => { dragging = false; pointer = null; suppressClick = true; if (paintPending) paint(); });
+    document.addEventListener('selectionchange', () => { updateSelection(); schedulePositionRemove(); if (paintPending && !dragging && !root.getSelection?.()?.toString()) paint(); });
     document.addEventListener('click', e => {
       const text = e.target.closest('[data-annotatable]'); if (!text || drawer || view !== 'session') return;
       if (suppressClick) { suppressClick = false; e.preventDefault(); return; }
@@ -288,6 +306,6 @@
     });
     document.addEventListener('focusout', e => { if (e.target.closest('[data-pron-rail]')) setTimeout(() => refresh(), 0); });
   }
-  function reset() { context = ''; active = null; hovered = null; lastPage = ''; undo = null; dragging = false; pointer = null; suppressClick = false; keyboardStart = null; document.querySelector('[data-pron-remove-floating]')?.remove(); }
+  function reset() { context = ''; active = null; hovered = null; lastPage = ''; undo = null; dragging = false; pointer = null; suppressClick = false; keyboardStart = null; paintPending = false; if (positionFrame !== null) root.cancelAnimationFrame(positionFrame); positionFrame = null; document.querySelector('[data-pron-remove-floating]')?.remove(); }
   root.PRONUNCIATION = { controls, html, paint, mount, open, reset, init, selectionAnchors, positionRemove };
 })(window);
