@@ -7,7 +7,7 @@ import { JSDOM } from 'jsdom';
 const dom = new JSDOM('<div id="app"></div><div id="toast"></div>', { url: 'https://sprachraum.test/', runScripts: 'outside-only', pretendToBeVisual: true });
 const w = dom.window, d = w.document, run = code => vm.runInContext(code, dom.getInternalVMContext());
 Object.defineProperty(w, 'crypto', { value: webcrypto }); w.TextEncoder = TextEncoder; w.scrollTo = () => {}; w.HTMLElement.prototype.scrollIntoView = () => {};
-for (const file of ['lessons.js','advanced-lessons.js','lesson-format.js','session-format.js','lesson-library.js','lesson-authoring.js','room-client.js','pronunciation.js','collaboration.js','app.js']) run(fs.readFileSync('dist/' + file, 'utf8'));
+for (const file of ['lessons.js','advanced-lessons.js','lesson-format.js','session-format.js','lesson-library.js','lesson-authoring.js','room-client.js','lesson-width.js','pronunciation.js','collaboration.js','app.js']) run(fs.readFileSync('dist/' + file, 'utf8'));
 run("start('releases');state.presentation.role='teacher';render()");
 const source = 'Äpfel 🥣 und Äpfel: heute sprechen wir miteinander. Noch ein Satz.';
 run(`LESSONS.release.reading[0].paragraphs[0]=${JSON.stringify(source)};render()`);
@@ -77,5 +77,34 @@ assert(!q(`[data-focus-id="${activeId}"]`), 'remote deletion removes the active 
 const beforeNavigation = marks().length; select(word('und')); run("navigate('reading',1)");
 d.dispatchEvent(new w.Event('selectionchange')); pointer(q('.material'), 'pointerup'); assert.equal(marks().length, beforeNavigation); assert(!q('[data-pron-add-selection]'));
 assert(w.COLLAB.backup().session.annotations.length === marks().length);
+
+// The removal control is outside the text: selecting/exporting a passage never includes its ×.
+run("navigate('reading',0)");
+w.HTMLElement.prototype.getClientRects = function () { return this.matches('[data-mark]') ? [{ top: 200, right: 300, bottom: 225, left: 250, width: 50, height: 25 }] : []; };
+const beforeRemovalText = first().textContent, chosenMark = q('.material [data-mark]');
+chosenMark.dispatchEvent(new w.Event('pointerover', { bubbles: true }));
+const removeButton = q('[data-pron-remove-floating]'); assert(removeButton && !removeButton.hidden);
+const removedId = removeButton.dataset.markId, removedMark = marks().find(a => a.id === removedId);
+assert.equal(removeButton.textContent, '×'); assert(!removeButton.closest('[data-annotatable]'));
+tap(removeButton); assert(!marks().some(a => a.id === removedId)); assert.equal(first().textContent, beforeRemovalText);
+tap(q('[data-pron-undo]')); assert.deepEqual(marks().find(a => a.id === removedId), removedMark);
+run("state.presentation.role='learner';state.presentation.showMarks=true;render()"); assert(!q('[data-pron-remove-floating]') || q('[data-pron-remove-floating]').hidden);
+
+// Width shortcuts must not also move the word cursor or enter the session backup.
+run("state.presentation.role='teacher';render()");
+Object.defineProperty(w, 'innerWidth', { value: 1800, writable: true }); w.LESSON_WIDTH.mount();
+word('und').focus(); const wordFocus = d.activeElement;
+key(wordFocus, 'ArrowRight', { code: 'ArrowRight', ctrlKey: true, altKey: true });
+assert.equal(d.documentElement.style.getPropertyValue('--lesson-width'), '1400px'); assert.equal(d.activeElement, wordFocus);
+key(wordFocus, 'ArrowLeft', { code: 'ArrowLeft', ctrlKey: true, altKey: true }); assert.equal(q('[data-width-label]').textContent, '1320 px');
+q('[data-width-wider]').dispatchEvent(new w.MouseEvent('click', { bubbles: true, shiftKey: true })); assert.equal(q('[data-width-label]').textContent, '1560 px');
+assert.equal(JSON.parse(w.localStorage.getItem('sprachraum.lesson-width.v1')), 1560);
+run('render()'); assert.equal(q('[data-width-label]').textContent, '1560 px');
+w.innerWidth = 900; w.dispatchEvent(new w.Event('resize')); assert.equal(q('[data-width-label]').textContent, '900 px');
+assert(q('[data-width-wider]').disabled); assert.equal(JSON.parse(w.localStorage.getItem('sprachraum.lesson-width.v1')), 1560);
+w.innerWidth = 1800; w.dispatchEvent(new w.Event('resize')); assert.equal(q('[data-width-label]').textContent, '1560 px');
+key(q('[data-width-reset]'), 'ArrowDown', { code: 'ArrowDown', ctrlKey: true, altKey: true });
+assert.equal(w.localStorage.getItem('sprachraum.lesson-width.v1'), null); assert.equal(d.documentElement.style.getPropertyValue('--lesson-width'), '');
+assert(q('[data-width-reset]').disabled); assert(!JSON.stringify(w.COLLAB.backup()).includes('lesson-width'));
 dom.window.close();
-console.log('Pronunciation: tap, phrase drag, exact anchors, duplicate focus, undo, touch scrolling/selection, keyboard, quiet review, remote edits and navigation passed.');
+console.log('Pronunciation: selection, review, inline removal/undo and exact anchors passed. Width: controls, keyboard isolation, saved preference, viewport clamp and reset passed.');

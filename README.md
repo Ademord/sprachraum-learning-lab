@@ -12,6 +12,10 @@ Teacher view opens in **Mark words** mode. Click or tap a word to mark it immedi
 
 Learners switch from **Read** to **Review pronunciation** when ready. The same rail shows feedback and practice progress while keeping the passage usable. On narrow screens it becomes a bounded bottom panel. All marks, notes and practice state retain the existing synchronization and JSON backup format. The lesson title stays compact; its goals appear on hover, keyboard focus or a tap.
 
+In Teacher view, a small white × appears at the top-right of the hovered or focused highlight. It removes that mark, with Undo available. The control sits outside the passage so text anchors stay unchanged.
+
+The **Width** control adjusts the lesson body by 80 px, or 240 px with Shift-click. **Ctrl+Alt+Left/Right** narrows/widens it; **Ctrl+Alt+Down** resets. Width is saved on the current device, bounded by the viewport, and kept separate from shared lesson data. The two-column lesson uses a 760 px minimum on larger screens. This follows the behavior of [claude-wide-column](https://github.com/Ademord/claude-wide-column).
+
 With my teacher creates a server-backed room and a private teacher invitation. The teacher must also have access to the hosted Site. One signed-in teacher can claim an invitation; the learner can replace it or end sharing. The server checks identity and role on every operation. Learner and teacher navigate independently, with an optional Follow learner control. The original local lesson remains available.
 
 Each client sends field-level edits and polls for revisions about once per second. D1 is authoritative for shared rooms. Operation IDs make retries idempotent; compare-and-set edits preserve conflicts instead of overwriting writing. Pending edits remain in the local session and its full export. The interface reports connection or storage failures. This is HTTP polling, not WebSocket synchronization. The host does not currently expose a supported Durable Objects binding. The interactive guide at `dist/architecture.html` explains the choice and alternatives.

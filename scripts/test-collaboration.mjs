@@ -41,7 +41,7 @@ const run = code => vm.runInContext(code, dom.getInternalVMContext());
 w.TextEncoder = TextEncoder; w.scrollTo = () => {}; w.HTMLElement.prototype.scrollIntoView = () => {};
 w.fetch = async () => new Response(JSON.stringify({ rooms: [] }), { headers: { 'Content-Type': 'application/json' } });
 w.URL.createObjectURL = () => 'blob:test'; w.URL.revokeObjectURL = () => {};
-for (const file of ['lessons.js','advanced-lessons.js','lesson-format.js','session-format.js','lesson-library.js','lesson-authoring.js','room-client.js','pronunciation.js','collaboration.js','app.js']) run(fs.readFileSync('dist/' + file, 'utf8'));
+for (const file of ['lessons.js','advanced-lessons.js','lesson-format.js','session-format.js','lesson-library.js','lesson-authoring.js','room-client.js','lesson-width.js','pronunciation.js','collaboration.js','app.js']) run(fs.readFileSync('dist/' + file, 'utf8'));
 w.inputPacket = testPacket; run('installImportedLesson(inputPacket)');
 const viewSelect = w.document.querySelector('[data-view]'); viewSelect.value = 'teacher'; viewSelect.dispatchEvent(new w.Event('change'));
 const container = w.document.querySelector('[data-annotatable]');
@@ -135,7 +135,7 @@ function liveDOM(user, storage = []) {
     return worker.fetch(new Request(new URL(path,'https://sprachraum.test'),{method:options.method||'GET',headers:{'oai-authenticated-user-id':user,'Content-Type':'application/json',Origin:'https://sprachraum.test'},...(options.body?{body:options.body}:{})}),{DB:bridgeDB});
   };
   for(const [key,value] of storage)w.localStorage.setItem(key,value);
-  for(const file of ['lessons.js','advanced-lessons.js','lesson-format.js','session-format.js','lesson-library.js','lesson-authoring.js','room-client.js','pronunciation.js','collaboration.js','app.js'])run(fs.readFileSync('dist/'+file,'utf8'));
+  for(const file of ['lessons.js','advanced-lessons.js','lesson-format.js','session-format.js','lesson-library.js','lesson-authoring.js','room-client.js','lesson-width.js','pronunciation.js','collaboration.js','app.js'])run(fs.readFileSync('dist/'+file,'utf8'));
   return {w,run,dom,failWrites:value=>{failWrites=value},storage:()=>Array.from({length:w.localStorage.length},(_,i)=>{const key=w.localStorage.key(i);return [key,w.localStorage.getItem(key)]}),close:()=>{w.COLLAB.beforeLeave();dom.window.close()}};
 }
 const hostDOM=liveDOM('bridge-learner');hostDOM.w.fixture=testPacket;hostDOM.run('installImportedLesson(fixture)');

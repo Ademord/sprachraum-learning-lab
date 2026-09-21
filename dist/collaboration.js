@@ -28,7 +28,7 @@
   }
   function toolbar() {
     ensure();
-    return `<div class="lesson-tools"><div class="view-controls"><label class="sr-only" for="lesson-view">Lesson view</label><select id="lesson-view" data-view ${state.live?.role === 'teacher' ? 'disabled' : ''}><option value="learner" ${!canTeach() ? 'selected' : ''}>Learner view</option><option value="teacher" ${canTeach() ? 'selected' : ''}>Teacher view</option></select>${PRONUNCIATION.controls()}</div><button class="secondary" data-live>${state.live ? 'Shared session' : 'With my teacher'}</button><p class="sync-state ${esc(status.kind)}" data-sync-status role="status">${state.live ? esc(status.text || 'Connecting…') : 'On this device'}</p></div>`;
+    return `<div class="lesson-tools"><div class="view-controls"><label class="sr-only" for="lesson-view">Lesson view</label><select id="lesson-view" data-view ${state.live?.role === 'teacher' ? 'disabled' : ''}><option value="learner" ${!canTeach() ? 'selected' : ''}>Learner view</option><option value="teacher" ${canTeach() ? 'selected' : ''}>Teacher view</option></select>${PRONUNCIATION.controls()}</div>${LESSON_WIDTH.toolbar()}<button class="secondary" data-live>${state.live ? 'Shared session' : 'With my teacher'}</button><p class="sync-state ${esc(status.kind)}" data-sync-status role="status">${state.live ? esc(status.text || 'Connecting…') : 'On this device'}</p></div>`;
   }
   const markedHTML = (...args) => PRONUNCIATION.html(...args);
   function text(text, block, pageId = key()) { return `<span class="annotatable" data-annotatable data-page-id="${esc(pageId)}" data-block="${esc(block)}">${markedHTML(text, pageId, block)}</span>`; }
@@ -173,11 +173,11 @@
     all('[data-end-live]', async () => { try { capture(); if (client?.pending.length) { showError('Wait for pending edits to save, or download a backup first.'); return; } await api(`/${state.live.id}/close`, {}); beforeLeave(); delete state.live; persist(); closeDrawer(); render(); notify('Sharing ended. Your lesson and feedback remain here.'); } catch (e) { showError(e.message); } });
     all('[data-leave-live]', () => { beforeLeave(); welcome(); });
     const followInput = document.querySelector('[data-follow]'); if (followInput) followInput.onchange = () => { follow = followInput.checked; if (follow && client) client.accept({ session: client.remote, revision: client.revision }); };
-    PRONUNCIATION.mount();
+    PRONUNCIATION.mount(); LESSON_WIDTH.mount();
     if (state?.live?.role === 'teacher') document.querySelectorAll('[data-draft], [data-option], [data-check], [data-save], [data-remove]').forEach(el => { el.disabled = true; if (el.tagName === 'TEXTAREA') el.title = 'The learner edits this response.'; });
   }
   function init() {
-    PRONUNCIATION.init();
+    PRONUNCIATION.init(); LESSON_WIDTH.init();
     document.addEventListener('focusout', () => setTimeout(refreshViews, 0)); document.addEventListener('selectionchange', () => { if (!root.getSelection?.()?.toString()) refreshViews(); });
     root.addEventListener?.('pagehide', capture); root.addEventListener?.('online', () => client?.tick());
     const match = root.location?.hash.match(/^#room=([a-zA-Z0-9-]{8,100})&invite=([a-f0-9]{64})$/);
