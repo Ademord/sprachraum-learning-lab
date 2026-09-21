@@ -181,4 +181,4 @@ The schema covers field types; the importer also enforces unique page IDs across
 `;
   }
   root.LESSON_IO = { schema, areas, maxBytes, validate, normalize, fromLesson, prompt, words, bytes };
-})(window);
+})(typeof window !== 'undefined' ? window : globalThis);

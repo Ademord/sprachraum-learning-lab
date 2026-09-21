@@ -2,3 +2,8 @@
 node_modules/
 *.tar.gz
 *.zip
+dist/server/
+dist/client/
+dist/.openai/
+.local/
+.env*

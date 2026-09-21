@@ -1,0 +1,21 @@
+{
+  "name": "sprachraum-learning-lab",
+  "version": "0.4.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22.13.0"
+  },
+  "scripts": {
+    "build": "node scripts/build-server.mjs",
+    "dev": "node scripts/dev-server.mjs",
+    "db:generate": "drizzle-kit generate",
+    "test": "node scripts/validate-content.mjs && node scripts/test-import.mjs && node scripts/test-collaboration.mjs"
+  },
+  "devDependencies": {
+    "drizzle-kit": "0.31.10",
+    "drizzle-orm": "0.45.2",
+    "esbuild": "0.25.12",
+    "jsdom": "^26.1.0"
+  }
+}

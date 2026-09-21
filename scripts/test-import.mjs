@@ -15,7 +15,7 @@ function boot(stored = new Map(), { quota = false, clipboard = true } = {}) {
     localStorage: { getItem: k => stored.get(k), setItem(k, v) { if (quota) throw new Error('quota'); stored.set(k, v); } },
     setTimeout: () => 0, clearTimeout() {}, addEventListener() {}, AbortController, console };
   context.window = context; vm.createContext(context);
-  for (const file of ['lessons.js', 'advanced-lessons.js', 'lesson-format.js', 'lesson-library.js', 'lesson-authoring.js', 'app.js']) vm.runInContext(fs.readFileSync(`dist/${file}`, 'utf8'), context, { filename: file });
+  for (const file of ['lessons.js', 'advanced-lessons.js', 'lesson-format.js', 'session-format.js', 'lesson-library.js', 'lesson-authoring.js', 'room-client.js', 'collaboration.js', 'app.js']) vm.runInContext(fs.readFileSync(`dist/${file}`, 'utf8'), context, { filename: file });
   return { context, stored, elements, downloads, copied, tools, run: code => vm.runInContext(code, context), element };
 }
 const a = boot();
@@ -149,8 +149,8 @@ assert(!a.copied.at(-1).includes('Private earlier context'));
 // File import and stale reads share the same preview path as pasted JSON.
 await a.run('readLessonFile')({ target: { files: [{ size: raw.length, text: async () => raw }], value: 'example.json' } });
 assert(a.element('#import-result').innerHTML.includes('Format checked'));
-await a.run('readLessonFile')({ target: { files: [{ size: 1000001 }], value: 'too-big.json' } });
-assert(a.element('#import-result').innerHTML.includes('smaller than 1 MB'));
+await a.run('readLessonFile')({ target: { files: [{ size: 1600001 }], value: 'too-big.json' } });
+assert(a.element('#import-result').innerHTML.includes('smaller than 1.6 MB'));
 assert(!a.element('#import-result').innerHTML.includes('data-copy-repair'));
 let failSlowRead;
 const slowRead = a.run('readLessonFile')({ target: { files: [{ size: 100, text: () => new Promise((resolve, reject) => { failSlowRead = reject; }) }], value: 'slow.json' } });

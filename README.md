@@ -2,7 +2,19 @@
 
 A separate prototype for a teacher and learner working through German on one screen or via screen share.
 
-Open `dist/index.html` or serve `dist/` with any static HTTP server. No installation or API key is needed. Assets are plain HTML, CSS and JavaScript. Fonts load from Google Fonts with local sans-serif fallbacks.
+The frontend is plain HTML, CSS and JavaScript. Solo lessons work locally. Shared sessions use a small Cloudflare Worker and D1 database on Sites. No AI API key is needed. Fonts load from Google Fonts with local sans-serif fallbacks.
+
+For development, use Node 22.13 or later, run `npm ci`, then `npm run dev`. The local server is at `http://127.0.0.1:4186` and stores its test database in ignored `.local/`. Its mock identity defaults to a learner; a separate browser profile can use the local cookie `sprachraum-dev-role=teacher`. This mock identity exists only in the local server, never in the deployed Worker. Run `npm test` for checks and `npm run build` for a deployable Worker, frontend assets and migrations. `npm run db:generate` creates new Drizzle migrations; applied migration files must remain immutable.
+
+## Teacher feedback and shared sessions
+
+Teacher view supports native word/phrase selection in readings, referenced texts, dialogues, vocabulary examples, patterns, expressions and tone alternatives. A selected range becomes a soft-red pronunciation mark with an optional note. Learner view hides marks until Show teacher marks or Review is selected. Practice ticks and teacher notes are saved with the session. The lesson title stays compact; its goals appear on hover, keyboard focus or a tap.
+
+With my teacher creates a server-backed room and a private teacher invitation. The teacher must also have access to the hosted Site. One signed-in teacher can claim an invitation; the learner can replace it or end sharing. The server checks identity and role on every operation. Learner and teacher navigate independently, with an optional Follow learner control. The original local lesson remains available.
+
+Each client sends field-level edits and polls for revisions about once per second. D1 is authoritative for shared rooms. Operation IDs make retries idempotent; compare-and-set edits preserve conflicts instead of overwriting writing. Pending edits remain in the local session and its full export. The interface reports connection or storage failures. This is HTTP polling, not WebSocket synchronization. The host does not currently expose a supported Durable Objects binding. The interactive guide at `dist/architecture.html` explains the choice and alternatives.
+
+Notebook now offers a **full session JSON** backup: teaching content, drafts, legacy notes, conversation notes, saved phrases, teacher notes, pronunciation anchors, practice ticks, answers, tones, reveals and page positions. `sprachraum.session` version 1 wraps an unchanged `sprachraum.lesson` packet. Runtime page IDs are mapped to portable page IDs. Restore creates a separate session so existing notebooks are not replaced. Live invitation credentials and account IDs are excluded. Plain lesson-only JSON is still supported.
 
 ## Product structure
 
@@ -10,7 +22,7 @@ The opening screen asks for one topic and prepares a comprehensive prompt for an
 
 Expression contains three distinct operations: interpreting and restating an intention, comparing tone/register, and using phrases. Redemittel are useful conversational patterns; Redewendungen are figurative expressions. These are activities inside Expression rather than separate top-level destinations.
 
-There are 52 original activities across three prepared topics: releases and announcements, checking in after a difficult day, and expressing interest with a boundary. Each includes an eight-paragraph reading (752, 777, and 774 words respectively), four text-grounded interpretation questions, a countertext with competing perspectives, contextual vocabulary, advanced grammar, register work, role-play, and a 250–320-word writing/revision assignment. New topics use the external-agent prompt/import workflow. There is no in-app AI call, AI scoring, live teacher connection, or cross-device synchronization. Notes and page positions are local to the current browser. Free writing is discussed with a teacher; only a closed question has automatic answer-key feedback.
+There are 52 original activities across three prepared topics: releases and announcements, checking in after a difficult day, and expressing interest with a boundary. Each includes an eight-paragraph reading (752, 777, and 774 words respectively), four text-grounded interpretation questions, a countertext with competing perspectives, contextual vocabulary, advanced grammar, register work, role-play, and a 250–320-word writing/revision assignment. New topics use the external-agent prompt/import workflow. There is no in-app AI call or AI scoring. Free writing is discussed with a teacher; only a closed question has automatic answer-key feedback.
 
 ## Lesson authoring and interchange
 
@@ -29,6 +41,8 @@ Both supplied archives were fully extracted: C1.1 has 50 PDFs and 1,486 pages; C
 The local sibling folder `../learning-source-analysis/` contains original PDFs, page-numbered TXT and JSON, inventory, hashes, source evidence, and six rendered sample pages. Those original PDFs, raw extraction, and the supplied private conversation are not hosted. `dist/lessons.js` carries the specific activity-pattern references shown in the interface. New examples are not represented as copied PDF exercises or as validated C1 assessment material.
 
 ## Verification
+
+Revision 4: `npm test` includes the earlier checks plus full backup round trips, real DOM Range/Selection offset checks using jsdom, exact repeated-word/Unicode anchors, hidden/revealed marks, separate restore, two isolated DOM clients sharing the actual API with a SQLite D1 adapter, offline pending-state reload, concurrent edits, idempotent retry, preserved/resolved conflicts, invitation revocation, and request-size-bounded queue draining. UI selection was checked through jsdom, not a native browser or visual screenshot test. The server build is also checked. Production authorization uses the Site's forwarded authenticated-user headers; tests use synthetic identities.
 
 Revision 3: `node scripts/test-import.mjs` covers all three built-in export/import round trips and 52 imported page renderings, invalid packets, unsafe content, persistence and reload, revision drafts, duplicate/version isolation, paste-preview-import, clipboard success/fallback, quota failures, and damaged storage. `node scripts/validate-content.mjs` still passes the original content and draft checks. These are runtime checks with a DOM stub, not a browser layout or permission test. No new browser UI testing was performed for this revision.
 
@@ -56,4 +70,11 @@ The browser viewport control clamped the requested 390-pixel test to 520 CSS pix
 - `dist/lesson-library.js`: imported lesson storage, restoration, and duplicate handling.
 - `dist/lesson-authoring.js`, `dist/authoring.css`: prompt, clipboard, file import, preview, and repair workflow.
 - `scripts/test-import.mjs`: import and authoring regression checks.
-- `.openai/hosting.json`: private Site identity and static output configuration.
+- `dist/session-format.js`: portable session state, anchor validation and shared edit semantics.
+- `dist/collaboration.js`, `dist/room-client.js`, `dist/collaboration.css`: teacher/learner views, backups and live synchronization.
+- `server/worker.js`: authenticated room API and durable compare-and-set edits.
+- `db/schema.ts`, `drizzle/`: database schema and generated migrations.
+- `scripts/test-collaboration.mjs`: DOM, API, concurrency, persistence and backup tests.
+- `docs/collaboration-plan.md`: dependency graph and acceptance checks.
+- `dist/architecture.html`: architecture explanation and timing demonstration.
+- `.openai/hosting.json`: existing Site identity and logical D1 binding.
