@@ -12,7 +12,7 @@ Teacher view opens in **Mark words** mode. Click or tap a word to mark it immedi
 
 Learners switch from **Read** to **Review pronunciation** when ready. The same rail shows feedback and practice progress while keeping the passage usable. On narrow screens it becomes a bounded bottom panel. All marks, notes and practice state retain the existing synchronization and JSON backup format. The lesson title stays compact; its goals appear on hover, keyboard focus or a tap.
 
-In Teacher view, a small white × appears at the top-right of the hovered or focused highlight. It removes that mark, with Undo available. The control sits outside the passage so text anchors stay unchanged.
+In Teacher view, a small white × appears at the top-right only while hovering over a highlight or the × itself. It removes that mark, with Undo available. The control sits outside the passage so text anchors stay unchanged. The review panel's Remove button remains available for touch and keyboard use.
 
 The **Width** control adjusts the lesson body by 80 px, or 240 px with Shift-click. **Ctrl+Alt+Left/Right** narrows/widens it; **Ctrl+Alt+Down** resets. Width is saved on the current device, bounded by the viewport, and kept separate from shared lesson data. The two-column lesson uses a 760 px minimum on larger screens. This follows the behavior of [claude-wide-column](https://github.com/Ademord/claude-wide-column).
 

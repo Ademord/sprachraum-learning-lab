@@ -204,7 +204,7 @@
   }
   function positionRemove() {
     let button = document.querySelector('[data-pron-remove-floating]');
-    const id = hovered || active;
+    const id = hovered;
     const mark = id && [...document.querySelectorAll('.material [data-mark]')].find(el => el.dataset.mark === id);
     const rect = mark?.getClientRects()[0];
     if (!state || view !== 'session' || !teacher() || drawer || dragging || root.getSelection?.()?.toString() || !rect || !rect.width || rect.bottom < 20 || rect.top > root.innerHeight - 20 || mark.closest('details:not([open])')) { if (button) button.hidden = true; return; }
@@ -244,9 +244,8 @@
   }
   function init() {
     document.addEventListener('pointerdown', e => { pointer = null; dragging = false; if ((e.button === undefined || e.button === 0) && e.target.closest('[data-annotatable]') && teacher() && marking && !drawer) { pointer = { x: e.clientX, y: e.clientY, type: e.pointerType }; dragging = true; suppressClick = false; positionRemove(); } });
-    document.addEventListener('pointerover', e => { const mark = e.target.closest('.material [data-mark]'); if (mark && teacher()) { hovered = mark.dataset.mark; positionRemove(); } });
+    document.addEventListener('pointerover', e => { const mark = e.target.closest('.material [data-mark]'); if (mark && teacher() && e.pointerType !== 'touch') { hovered = mark.dataset.mark; positionRemove(); } });
     document.addEventListener('pointerout', e => { if (e.target.closest('.material [data-mark]') && !e.relatedTarget?.closest?.('[data-pron-remove-floating],.material [data-mark]')) { hovered = null; positionRemove(); } });
-    document.addEventListener('focusin', e => { const mark = e.target.closest('.material [data-mark]'); if (mark) { hovered = mark.dataset.mark; positionRemove(); } });
     root.addEventListener('scroll', positionRemove, true); root.addEventListener('resize', positionRemove);
     document.addEventListener('pointerup', e => {
       const startedInText = !!pointer;
