@@ -1,7 +1,6 @@
 /* Pronunciation sits alongside the passage; the page stays usable. */
-.pron-modes{display:inline-flex;align-items:stretch;padding:4px;border:1px solid var(--line);border-radius:10px;background:#edf1ef;gap:3px}
-.pron-modes button{padding:8px 12px;border-radius:7px;font-size:14px;display:flex;gap:9px;align-items:center;min-height:36px}
-.pron-modes button[aria-pressed=true]{background:white;box-shadow:0 1px 4px #163c3017;color:var(--green);font-weight:600}
+.pron-tool{display:inline-flex;align-items:center;gap:9px;min-height:42px;padding:8px 12px;border:1px solid #cbd7d0;border-radius:8px;background:#fff;font-size:14px;transition:background .12s,border-color .12s}
+.pron-tool:hover{background:#f0f4f1}.pron-tool[aria-pressed=true]{background:#194740;border-color:#194740;color:#fff;box-shadow:inset 0 1px 3px #0b2c2840}.pron-tool[aria-pressed=true] .pron-count{background:#ffffff24;color:#fff}.pron-tool-icon{font-size:21px;line-height:1}
 .pron-count{font-size:12px;min-width:21px;padding:2px 5px;border-radius:5px;background:#e7eeea;color:#49625a;font-variant-numeric:tabular-nums}
 .pronunciation-open{overflow:visible}.pronunciation-open .canvas-grid{align-items:start}
 .activity[hidden],.pron-rail[hidden]{display:none!important}

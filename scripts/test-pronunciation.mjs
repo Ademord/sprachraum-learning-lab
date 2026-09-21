@@ -11,6 +11,7 @@ for (const file of ['lessons.js','advanced-lessons.js','lesson-format.js','sessi
 run("start('releases');state.presentation.role='teacher';render()");
 const source = 'Äpfel 🥣 und Äpfel: heute sprechen wir miteinander. Noch ein Satz.';
 run(`LESSONS.release.reading[0].paragraphs[0]=${JSON.stringify(source)};render()`);
+w.document.querySelector('[data-pron-mode]').click();
 const q = s => d.querySelector(s), qa = s => [...d.querySelectorAll(s)];
 const first = () => q('[data-annotatable]');
 const word = (text, occurrence = 0) => [...first().querySelectorAll('[data-pron-word]')].filter(el => el.textContent === text)[occurrence];
@@ -49,7 +50,7 @@ select(word('und')); d.dispatchEvent(new w.Event('selectionchange')); assert(!q(
 w.getSelection().removeAllRanges(); d.dispatchEvent(new w.Event('selectionchange')); assert(q('[data-pron-selection]').hidden, 'collapsed selection clears its action');
 select(word('und')); pointer(word('und'), 'pointerdown', { button: 2 }); pointer(word('und'), 'pointerup', { button: 2 });
 assert.equal(marks().length, 4, 'right-clicking a selection does not mark it');
-tap(q('[data-pron-read]')); assert.equal(marks().length, 4, 'clicking outside the text does not commit an existing selection');
+tap(q('[data-pron-mode]')); assert.equal(marks().length, 4, 'clicking outside the text does not commit an existing selection');
 tap(q('[data-pron-mode]'));
 
 const firstWord = word('Äpfel'); firstWord.focus(); key(firstWord, 'Enter'); assert.equal(marks().length, 5);
@@ -60,7 +61,7 @@ key(d.activeElement, 'z', { ctrlKey: true }); assert.equal(marks().length, 5);
 word('Satz').focus(); key(d.activeElement, 'ArrowRight', { shiftKey: true }); key(d.activeElement, 'Enter');
 assert.equal(marks().length, 7, 'keyboard phrase across paragraphs creates precise anchors for both blocks');
 key(d.activeElement, 'z', { ctrlKey: true }); assert.equal(marks().length, 5, 'one undo removes the multi-paragraph gesture');
-tap(q('[data-pron-read]')); assert(!q('.activity').hidden); assert(q('[data-pron-rail]').hidden); assert.equal(qa('[data-pron-word]').length, 0);
+tap(q('[data-pron-mode]')); assert(!q('.activity').hidden); assert(q('[data-pron-rail]').hidden); assert.equal(qa('[data-pron-word]').length, 0);
 tap(q('[data-pron-mode]')); assert(q('.activity').hidden); assert(qa('[data-pron-word]').length);
 
 run("state.presentation.role='learner';state.presentation.showMarks=false;render()"); assert.equal(qa('.material mark').length, 0);
@@ -70,7 +71,7 @@ tap(q('[data-pron-practise]')); assert.equal(q('[data-pron-practise]').getAttrib
 tap(q('[data-pron-next]')); assert(q('.pron-focus'));
 key(q('.material'), 'Escape'); assert.equal(qa('.material mark').length, 0); assert(!q('.activity').hidden);
 
-run("state.presentation.role='teacher';render()"); tap(q('[data-mark]'));
+run("state.presentation.role='teacher';render()"); tap(q('[data-pron-mode]')); tap(q('[data-mark]'));
 const activeId = q('[data-focus-id]').dataset.focusId; q('[data-mark-note]').focus();
 run(`state.annotations=state.annotations.filter(a=>a.id!==${JSON.stringify(activeId)});delete state.practiced[${JSON.stringify(activeId)}];COLLAB.paintMarks()`);
 assert(!q(`[data-focus-id="${activeId}"]`), 'remote deletion removes the active note safely');
@@ -91,7 +92,7 @@ tap(q('[data-pron-undo]')); assert.deepEqual(marks().find(a => a.id === removedI
 run("state.presentation.role='learner';state.presentation.showMarks=true;render()"); assert(!q('[data-pron-remove-floating]') || q('[data-pron-remove-floating]').hidden);
 
 // Width shortcuts must not also move the word cursor or enter the session backup.
-run("state.presentation.role='teacher';render()");
+run("state.presentation.role='teacher';render()"); tap(q('[data-pron-mode]'));
 Object.defineProperty(w, 'innerWidth', { value: 1800, writable: true }); w.LESSON_WIDTH.mount();
 word('und').focus(); const wordFocus = d.activeElement;
 key(wordFocus, 'ArrowRight', { code: 'ArrowRight', ctrlKey: true, altKey: true });

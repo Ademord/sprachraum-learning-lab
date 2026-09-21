@@ -9,11 +9,11 @@
   const words = value => [...value.matchAll(/[\p{L}\p{M}\p{N}]+(?:[’'–-][\p{L}\p{M}\p{N}]+)*/gu)].map(m => ({ start: m.index, end: m.index + m[0].length, text: m[0] }));
   function ensure() {
     const next = `${state?.id}:${teacher()}`;
-    if (context !== next) { context = next; marking = teacher(); panel = teacher() || visible(); active = null; hovered = null; lastPage = ''; undo = null; keyboardStart = null; }
+    if (context !== next) { context = next; marking = false; panel = !teacher() && visible(); active = null; hovered = null; lastPage = ''; undo = null; keyboardStart = null; }
   }
   function controls() {
     ensure();
-    return `<div class="pron-modes" role="group" aria-label="Reading and pronunciation"><button data-pron-read aria-pressed="${!panel}">Read</button><button data-pron-mode aria-pressed="${panel}">${teacher() ? 'Mark words' : 'Review pronunciation'}<span class="pron-count" data-mark-count>${state.annotations.length}</span></button></div>`;
+    return `<button class="pron-tool" data-pron-mode aria-pressed="${teacher() ? marking : panel}" title="${teacher() ? 'Turn word marking on or off' : 'Show or hide pronunciation review'}"><span class="pron-tool-icon" aria-hidden="true">${teacher() ? '✎' : '◌'}</span>${teacher() ? 'Mark words' : 'Review pronunciation'}<span class="pron-count" data-mark-count>${state.annotations.length}</span></button>`;
   }
   function wordHTML(clean, start, end) {
     const part = clean.slice(start, end);
@@ -131,8 +131,7 @@
     const rail = document.querySelector('[data-pron-rail]'); if (!rail) return;
     document.querySelector('.activity').hidden = panel;
     rail.hidden = !panel; document.querySelector('.canvas')?.classList.toggle('pronunciation-open', panel);
-    document.querySelectorAll('[data-pron-read]').forEach(el => el.setAttribute('aria-pressed', String(!panel)));
-    document.querySelectorAll('[data-pron-mode]').forEach(el => el.setAttribute('aria-pressed', String(panel)));
+    document.querySelectorAll('[data-pron-mode]').forEach(el => el.setAttribute('aria-pressed', String(teacher() ? marking : panel)));
     if (!panel) return;
     if (!force && rail.contains(document.activeElement) && document.activeElement.matches('textarea')) {
       if (!active || state.annotations.some(a => a.id === active)) return;
@@ -163,11 +162,10 @@
       if (teacher() && marking) material.querySelector('#page-title')?.insertAdjacentHTML('afterend', '<p class="pron-instruction" data-pron-instruction><span class="pron-pen" aria-hidden="true">✎</span> Click a word to mark it. Drag to mark a phrase.</p>');
     }
     paint(); updateSelection();
-    document.querySelectorAll('[data-pron-read]').forEach(el => el.onclick = () => close());
-    document.querySelectorAll('[data-pron-mode]').forEach(el => el.onclick = () => open());
+    document.querySelectorAll('[data-pron-mode]').forEach(el => el.onclick = () => { if (teacher() ? marking : panel) close(); else open(null, false, teacher()); });
   }
-  function open(id, locate = false) {
-    closeDrawer(false); ensure(); panel = true; marking = teacher(); root.getSelection?.()?.removeAllRanges();
+  function open(id, locate = false, activateTool = false) {
+    closeDrawer(false); ensure(); panel = true; if (activateTool && teacher()) marking = true; root.getSelection?.()?.removeAllRanges();
     if (!teacher()) { state.presentation.showMarks = true; persist(); }
     if (id) active = id; else if (!currentMark()) active = ordered().find(a => a.pageId === key())?.id || ordered()[0]?.id || null;
     if (locate && currentMark()) goTo(currentMark());
@@ -176,7 +174,7 @@
   function close() {
     panel = false; marking = false; keyboardStart = null; root.getSelection?.()?.removeAllRanges();
     if (!teacher()) { state.presentation.showMarks = false; persist(); }
-    mount(); document.querySelector('[data-pron-read]')?.focus({ preventScroll: true });
+    mount(); document.querySelector('[data-pron-mode]')?.focus({ preventScroll: true });
   }
   function goTo(mark) {
     active = mark.id;

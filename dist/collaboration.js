@@ -4,6 +4,12 @@
   const IO = root.SESSION_IO;
   let client = null, applying = false, captureTimer, status = { text: '', kind: '' }, invitation = null, follow = false, navigationEpoch = 0, refreshPending = false;
   const uuid = () => crypto.randomUUID();
+  const pendingInviteKey = 'sprachraum.pending-invitation.v1';
+  let invitationSaved = true;
+  const signInHTML = () => '<p class="hint">Sign in to create or join a shared lesson.</p><a class="primary" href="/signin-with-chatgpt?return_to=%2F" target="_top">Sign in with ChatGPT</a>' + (!invitationSaved ? '<p class="hint">This browser cannot keep the invitation during sign-in. Reopen your teacher link after signing in.</p>' : '');
+  function rememberInvitation(value) { try { sessionStorage.setItem(pendingInviteKey, JSON.stringify({ ...value, savedAt: Date.now() })); return true; } catch { return false; } }
+  function pendingInvitation() { try { const value = JSON.parse(sessionStorage.getItem(pendingInviteKey)); return value && /^[a-zA-Z0-9-]{8,100}$/.test(value.id) && /^[a-f0-9]{64}$/.test(value.token) && Date.now() - value.savedAt >= 0 && Date.now() - value.savedAt < 86400000 ? { id: value.id, token: value.token } : null; } catch { return null; } }
+  function forgetInvitation() { invitation = null; try { sessionStorage.removeItem(pendingInviteKey); } catch {} }
   const role = () => state?.presentation?.role || 'learner';
   const canTeach = () => role() === 'teacher';
   function ensure(s = state) {
@@ -28,7 +34,7 @@
   }
   function toolbar() {
     ensure();
-    return `<div class="lesson-tools"><div class="view-controls"><label class="sr-only" for="lesson-view">Lesson view</label><select id="lesson-view" data-view ${state.live?.role === 'teacher' ? 'disabled' : ''}><option value="learner" ${!canTeach() ? 'selected' : ''}>Learner view</option><option value="teacher" ${canTeach() ? 'selected' : ''}>Teacher view</option></select>${PRONUNCIATION.controls()}</div>${LESSON_WIDTH.toolbar()}<button class="secondary" data-live>${state.live ? 'Shared session' : 'With my teacher'}</button><p class="sync-state ${esc(status.kind)}" data-sync-status role="status">${state.live ? esc(status.text || 'Connecting…') : 'On this device'}</p></div>`;
+    return `<div class="lesson-tools"><div class="view-controls"><div class="role-control"><span class="role-label ${!canTeach() ? 'current' : ''}">Learner</span><button type="button" class="role-switch" role="switch" data-view aria-label="Teacher view" aria-checked="${canTeach()}" ${state.live?.role === 'teacher' ? 'disabled title="This shared session is assigned to you as the teacher"' : ''}><span aria-hidden="true"></span></button><span class="role-label ${canTeach() ? 'current' : ''}">Teacher</span></div>${PRONUNCIATION.controls()}</div>${LESSON_WIDTH.toolbar()}<button class="secondary" data-live>${state.live ? 'Shared session' : 'With my teacher'}</button><p class="sync-state ${esc(status.kind)}" data-sync-status role="status">${state.live ? esc(status.text || 'Connecting…') : 'On this device'}</p></div>`;
   }
   const markedHTML = (...args) => PRONUNCIATION.html(...args);
   function text(text, block, pageId = key()) { return `<span class="annotatable" data-annotatable data-page-id="${esc(pageId)}" data-block="${esc(block)}">${markedHTML(text, pageId, block)}</span>`; }
@@ -52,16 +58,16 @@
   function paintMarks() { PRONUNCIATION.paint(); }
   function liveBody() {
     const live = state?.live;
-    return `<p class="intro">Share this lesson and its notes with your teacher. Each person can move around independently.</p>${live ? `<p class="sync-state ${esc(status.kind)}" data-sync-status role="status">${esc(status.text || 'Connecting…')}</p>${status.conflict ? `<div class="storage-warning"><p>Your pending work is still on this device. Download a full backup before leaving.</p>${!status.conflict.permanent ? '<button class="secondary" data-conflict-local>Keep my edit</button> <button class="secondary" data-conflict-server>Use shared edit</button>' : '<button class="secondary" data-reconnect>Try reconnecting</button>'}</div>` : ''}${live.role === 'learner' ? live.invitation ? inviteHTML(live.id, live.invitation) : '<button class="secondary" data-new-invite>Create a new teacher invitation</button><p class="hint">A new invitation disconnects the previous teacher.</p>' : `<label class="follow-control"><input type="checkbox" data-follow ${follow ? 'checked' : ''}> Follow the learner’s page</label>`}<button class="secondary" data-backup>Download full session JSON</button><div class="live-end"><button class="source-button" data-leave-live>Leave this screen</button>${live.role === 'learner' ? '<button class="source-button" data-end-live>End shared session</button>' : ''}</div>` : state ? '<p class="hint">Starting a shared session sends this lesson, your drafts and notes to the session server. Only you and the invited teacher can open the room.</p><button class="primary" data-create-live>Start shared session</button><p class="hint">Your teacher also needs permission to open this Site.</p>' : ''}<p class="block-title">Your shared sessions</p><div data-cloud-rooms><p class="hint">Loading…</p></div><p class="hint"><a href="architecture.html" target="_blank" rel="noopener">How synchronization works</a></p><p class="hint" data-live-error role="status"></p>`;
+    return `<p class="intro">Share this lesson and its notes with your teacher. Each person can move around independently.</p>${live ? `<p class="sync-state ${esc(status.kind)}" data-sync-status role="status">${esc(status.text || 'Connecting…')}</p>${status.conflict ? `<div class="storage-warning"><p>Your pending work is still on this device. Download a full backup before leaving.</p>${!status.conflict.permanent ? '<button class="secondary" data-conflict-local>Keep my edit</button> <button class="secondary" data-conflict-server>Use shared edit</button>' : '<button class="secondary" data-reconnect>Try reconnecting</button>'}</div>` : ''}${live.role === 'learner' ? live.invitation ? inviteHTML(live.id, live.invitation) : '<button class="secondary" data-new-invite>Create a new teacher invitation</button><p class="hint">A new invitation disconnects the previous teacher.</p>' : `<label class="follow-control"><input type="checkbox" data-follow ${follow ? 'checked' : ''}> Follow the learner’s page</label>`}<button class="secondary" data-backup>Download full session JSON</button><div class="live-end"><button class="source-button" data-leave-live>Leave this screen</button>${live.role === 'learner' ? '<button class="source-button" data-end-live>End shared session</button>' : ''}</div>` : state ? '<p class="hint">Starting a shared session sends this lesson, your drafts and notes to the session server. Only you and the invited teacher can open the room.</p><button class="primary" data-create-live>Start shared session</button><p class="hint">Your teacher signs in with ChatGPT to join.</p>' : ''}<p class="block-title">Your shared sessions</p><div data-cloud-rooms><p class="hint">Loading…</p></div><p class="hint"><a href="architecture.html" target="_blank" rel="noopener">How synchronization works</a></p><div class="hint" data-live-error role="status"></div>`;
   }
   function inviteHTML(id, token) {
     const link = `${location.origin}/#room=${encodeURIComponent(id)}&invite=${token}`;
-    return `<label class="response-label" for="teacher-link">Teacher invitation</label><input class="brief-input" id="teacher-link" readonly value="${esc(link)}"><button class="primary" data-copy-invite>Copy teacher link</button><p class="hint">Send this privately to your teacher. It joins one teacher to this session. Site access is still required.</p>`;
+    return `<label class="response-label" for="teacher-link">Teacher invitation</label><input class="brief-input" id="teacher-link" readonly value="${esc(link)}"><button class="primary" data-copy-invite>Copy teacher link</button><p class="hint">Send this privately to your teacher. They sign in with ChatGPT, then join this session.</p>`;
   }
   async function api(path, bodyValue) {
     const response = await fetch('/api/rooms' + path, { method: bodyValue === undefined ? 'GET' : 'POST', headers: { 'Content-Type': 'application/json' }, ...(bodyValue === undefined ? {} : { body: JSON.stringify(bodyValue) }), credentials: 'same-origin', cache: 'no-store' });
     let value; try { value = await response.json(); } catch { throw new Error('The sharing service is unavailable. Your local lesson is still here.'); }
-    if (!response.ok) throw new Error(value.error || 'Could not open the shared session.'); return value;
+    if (!response.ok) { const error = new Error(value.error || 'Could not open the shared session.'); error.status = response.status; throw error; } return value;
   }
   const token = () => [...crypto.getRandomValues(new Uint8Array(32))].map(b => b.toString(16).padStart(2, '0')).join('');
   function saveLocal() { applying = true; try { persist(); } finally { applying = false; } }
@@ -122,14 +128,15 @@
       if (state !== initiatingState || epoch !== navigationEpoch) return;
       const editsDuringCreate = IO.diff(full.session, backup(initiatingState).session, 'owner', uuid);
       attach(data, initiatingState, editsDuringCreate); openDrawer('live');
-    } catch (e) { showError(e.message); if (button) button.disabled = false; }
+    } catch (e) { showError(e.message, e.status); if (button) button.disabled = false; }
   }
-  function showError(message) { const field = document.querySelector('[data-live-error]'); if (field) field.textContent = message; else notify(message); }
+  function showError(message, status) { const field = document.querySelector('[data-live-error]'); if (field) { if (status === 401) field.innerHTML = signInHTML(); else field.textContent = message; } else notify(message); }
   async function openRoom(id, joinToken) {
     try {
       beforeLeave();
       const epoch = navigationEpoch;
       const data = joinToken ? await api(`/${id}/join`, { invitation: joinToken }) : await api(`/${id}?full=1`);
+      if (joinToken) { forgetInvitation(); if (root.location.hash.startsWith('#room=')) history.replaceState(null, '', location.pathname + location.search); }
       if (epoch !== navigationEpoch) return;
       const checked = IO.validate({ format: 'sprachraum.session', version: 1, lesson: data.lesson, session: data.session });
       if (!checked.ok) throw new Error(checked.errors.join(' '));
@@ -142,7 +149,7 @@
       sessions[localId].pendingEdits = pending;
       if (data.closed) { delete sessions[localId].live; const restoredId='restored-'+uuid(); sessions[restoredId]={...sessions[localId],id:restoredId};openSession(restoredId,false);notify('Ended session opened as a separate local copy.');return; }
       openSession(localId, false); attach(data, state, pending);
-    } catch (e) { showError(e.message); }
+    } catch (e) { if (joinToken && [400,403,404,409,410].includes(e.status)) forgetInvitation(); showError(e.message, e.status); }
   }
   async function reconnect() {
     if (!state?.live) return;
@@ -156,7 +163,7 @@
       const target = document.querySelector('[data-cloud-rooms]'); if (!target) return;
       target.innerHTML = data.rooms.length ? data.rooms.map(r => `<button class="topic-choice" data-open-room="${esc(r.id)}"><span>${esc(r.title)}<small>${r.role === 'teacher' ? 'Teacher' : 'Learner'}${r.closed ? ' · ended' : ''}</small></span><span>↗</span></button>`).join('') : '<p class="hint">No shared sessions yet.</p>';
       target.querySelectorAll('[data-open-room]').forEach(el => el.onclick = () => openRoom(el.dataset.openRoom));
-    } catch (e) { if (drawer === 'live') { const target = document.querySelector('[data-cloud-rooms]'); if (target) target.innerHTML = '<p class="hint">' + esc(e.message) + '</p>'; } }
+    } catch (e) { if (drawer === 'live') { const target = document.querySelector('[data-cloud-rooms]'); if (target) target.innerHTML = e.status === 401 ? signInHTML() : '<p class="hint">' + esc(e.message) + '</p>'; } }
   }
   function beforeLeave() { capture(); navigationEpoch++; clearTimeout(captureTimer); client?.stop(); client = null; PRONUNCIATION.reset(); }
   function bind() {
@@ -166,7 +173,7 @@
     all('[data-backup]', () => downloadBackup()); all('[data-feedback]', () => PRONUNCIATION.open());
     all('[data-live]', () => openDrawer('live')); all('[data-create-live]', createRoom);
     all('[data-open-session]', el => openSession(el.dataset.openSession));
-    const viewSelect = document.querySelector('[data-view]'); if (viewSelect) viewSelect.onchange = () => { ensure(); state.presentation.role = viewSelect.value; persist(); render(); };
+    const viewToggle = document.querySelector('[data-view]'); if (viewToggle) viewToggle.onclick = () => { if (state.live?.role === 'teacher') return; ensure(); state.presentation.role = canTeach() ? 'learner' : 'teacher'; persist(); render(); document.querySelector('[data-view]')?.focus({ preventScroll: true }); };
     all('[data-copy-invite]', async () => { const field = document.querySelector('#teacher-link'); try { await navigator.clipboard.writeText(field.value); notify('Teacher link copied.'); } catch { field.focus(); field.select(); showError('Copy the selected teacher link manually.'); } });
     all('[data-conflict-local]', () => { client?.resolve(true); openDrawer('live'); }); all('[data-conflict-server]', () => { client?.resolve(false); openDrawer('live'); }); all('[data-reconnect]', reconnect);
     all('[data-new-invite]', async () => { try { const value = token(); await api(`/${state.live.id}/invite`, { invitation: value }); state.live.invitation = value; saveLocal(); openDrawer('live'); } catch (e) { showError(e.message); } });
@@ -181,7 +188,9 @@
     document.addEventListener('focusout', () => setTimeout(refreshViews, 0)); document.addEventListener('selectionchange', () => { if (!root.getSelection?.()?.toString()) refreshViews(); });
     root.addEventListener?.('pagehide', capture); root.addEventListener?.('online', () => client?.tick());
     const match = root.location?.hash.match(/^#room=([a-zA-Z0-9-]{8,100})&invite=([a-f0-9]{64})$/);
-    if (match) { invitation = { id: match[1], token: match[2] }; history.replaceState(null, '', location.pathname + location.search); openDrawer('live'); openRoom(invitation.id, invitation.token); }
+    if (match) { invitation = { id: match[1], token: match[2] }; invitationSaved = rememberInvitation(invitation); if (invitationSaved) history.replaceState(null, '', location.pathname + location.search); }
+    else invitation = pendingInvitation();
+    if (invitation) { openDrawer('live'); openRoom(invitation.id, invitation.token); }
   }
   root.COLLAB = { ensure, toolbar, text, referencePage, selectionAnchor, paintMarks, liveBody, cloudRooms, bind, init, changed, beforeLeave, reconnect, backup, restore, downloadBackup, sourceFor, capture, openRoom, createRoom, syncNow: async () => { capture(); await client?.tick(); } };
 })(window);

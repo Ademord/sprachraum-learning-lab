@@ -43,7 +43,7 @@ w.fetch = async () => new Response(JSON.stringify({ rooms: [] }), { headers: { '
 w.URL.createObjectURL = () => 'blob:test'; w.URL.revokeObjectURL = () => {};
 for (const file of ['lessons.js','advanced-lessons.js','lesson-format.js','session-format.js','lesson-library.js','lesson-authoring.js','room-client.js','lesson-width.js','pronunciation.js','collaboration.js','app.js']) run(fs.readFileSync('dist/' + file, 'utf8'));
 w.inputPacket = testPacket; run('installImportedLesson(inputPacket)');
-const viewSelect = w.document.querySelector('[data-view]'); viewSelect.value = 'teacher'; viewSelect.dispatchEvent(new w.Event('change'));
+w.document.querySelector('[data-view]').click(); w.document.querySelector('[data-pron-mode]').click();
 const container = w.document.querySelector('[data-annotatable]');
 const chosen = [...container.querySelectorAll('[data-pron-word]')].find(el => Number(el.dataset.start) === start);
 const range = w.document.createRange(); range.selectNodeContents(chosen);
@@ -57,7 +57,7 @@ run("state.drafts[key()]='Typed during class';state.drafts['reading:0']='Earlier
 const note = w.document.querySelector('[data-mark-note]'); note.value = '<script>literal feedback</script>'; note.dispatchEvent(new w.Event('input'));
 run("closeDrawer();state.presentation.role='learner';render()"); assert.equal(w.document.querySelectorAll('.material mark').length, 0);
 w.document.querySelector('[data-pron-mode]').click(); assert.equal(w.document.querySelectorAll('.material mark').length, 1);
-w.document.querySelector('[data-pron-read]').click(); assert.equal(w.document.querySelectorAll('.material mark').length, 0);
+w.document.querySelector('[data-pron-mode]').click(); assert.equal(w.document.querySelectorAll('.material mark').length, 0);
 w.document.querySelector('[data-word]').click(); assert.equal(run('drawer'), 'word'); run('closeDrawer()');
 const exported = w.COLLAB.backup(); assert(!JSON.stringify(exported).includes('invitation'));
 w.backupInput = JSON.stringify(exported); const originalSession = run('state.id'); run('installImportedLesson(backupInput)');
@@ -125,16 +125,17 @@ assert.equal((await request('new-teacher', `/${id}`)).status, 410);
 learner.client.stop(); teacher.client.stop(); DB.close();
 // Exercise the actual view-to-transport bridge in two isolated DOM contexts.
 const bridgeDB = localDB();
-function liveDOM(user, storage = []) {
-  const dom = new JSDOM('<div id="app"></div><div id="toast"></div>', { url: 'https://sprachraum.test/', runScripts: 'outside-only', pretendToBeVisual: true });
+function liveDOM(user, storage = [], { hash = '', pendingInvite } = {}) {
+  const dom = new JSDOM('<div id="app"></div><div id="toast"></div>', { url: 'https://sprachraum.test/' + hash, runScripts: 'outside-only', pretendToBeVisual: true });
   const w = dom.window; const run = code => vm.runInContext(code, dom.getInternalVMContext());
   Object.defineProperty(w, 'crypto', { value: webcrypto }); w.TextEncoder=TextEncoder;w.scrollTo=()=>{};w.HTMLElement.prototype.scrollIntoView=()=>{};
   let failWrites=false;
   w.fetch=async (path, options={})=>{
     if(failWrites && path.endsWith('/ops'))throw new Error('offline');
-    return worker.fetch(new Request(new URL(path,'https://sprachraum.test'),{method:options.method||'GET',headers:{'oai-authenticated-user-id':user,'Content-Type':'application/json',Origin:'https://sprachraum.test'},...(options.body?{body:options.body}:{})}),{DB:bridgeDB});
+    return worker.fetch(new Request(new URL(path,'https://sprachraum.test'),{method:options.method||'GET',headers:{...(user?{'oai-authenticated-user-id':user}:{}),'Content-Type':'application/json',Origin:'https://sprachraum.test'},...(options.body?{body:options.body}:{})}),{DB:bridgeDB});
   };
   for(const [key,value] of storage)w.localStorage.setItem(key,value);
+  if (pendingInvite) w.sessionStorage.setItem('sprachraum.pending-invitation.v1', pendingInvite);
   for(const file of ['lessons.js','advanced-lessons.js','lesson-format.js','session-format.js','lesson-library.js','lesson-authoring.js','room-client.js','lesson-width.js','pronunciation.js','collaboration.js','app.js'])run(fs.readFileSync('dist/'+file,'utf8'));
   return {w,run,dom,failWrites:value=>{failWrites=value},storage:()=>Array.from({length:w.localStorage.length},(_,i)=>{const key=w.localStorage.key(i);return [key,w.localStorage.getItem(key)]}),close:()=>{w.COLLAB.beforeLeave();dom.window.close()}};
 }
@@ -153,6 +154,17 @@ const restoredDOM=liveDOM('bridge-teacher',savedBrowser);restoredDOM.failWrites(
 assert.equal(restoredDOM.w.COLLAB.backup().session.teacherNotes,'Pending feedback preserved in backup');
 restoredDOM.failWrites(false);await pump(restoredDOM,hostDOM);
 assert.equal(hostDOM.run('state.teacherNotes'),'Pending feedback preserved in backup');
+const anonymousDOM = liveDOM(null, [], { hash: `#room=${connection.id}&invite=${connection.invitation}` }); await pump(anonymousDOM);
+assert.equal(anonymousDOM.w.location.hash, '');
+const pendingInvite = anonymousDOM.w.sessionStorage.getItem('sprachraum.pending-invitation.v1');
+assert.equal(JSON.parse(pendingInvite).token, connection.invitation);
+const signInLink = anonymousDOM.w.document.querySelector('a[href^="/signin-with-chatgpt"]');
+assert(signInLink); assert.equal(signInLink.target, '_top'); assert(!signInLink.href.includes(connection.invitation));
+assert.equal(anonymousDOM.run('state'), null, 'anonymous invitation does not expose room content'); anonymousDOM.close();
+const signedInDOM = liveDOM('bridge-teacher', [], { pendingInvite }); await pump(signedInDOM);
+assert.equal(signedInDOM.run('state.live.id'), connection.id);
+assert.equal(signedInDOM.w.sessionStorage.getItem('sprachraum.pending-invitation.v1'), null);
+assert(!JSON.stringify(signedInDOM.w.COLLAB.backup()).includes(connection.invitation)); signedInDOM.close();
 hostDOM.close();restoredDOM.close();bridgeDB.close();
 console.log(JSON.stringify({ backupRoundTrips: 3, rangeSelection: 'repeated words, umlauts, emoji and inline word links', restoredState: 'drafts, earlier notes, feedback and marks preserved separately', twoParticipants: 'passed', concurrentEdits: 'passed', offlineReplay: 'passed', conflictingDrafts: 'preserved and resolved', idempotentRetry: 'passed', revokedInvitation: 'enforced', deletedMarkLatePractice: 'safe', largeOfflineBatches: 'drained' }, null, 2));
 
