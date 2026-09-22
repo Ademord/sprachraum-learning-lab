@@ -85,6 +85,32 @@ w.HTMLElement.prototype.getClientRects = function () { return this.matches('[dat
 const beforeRemovalText = first().textContent, chosenMark = q('.material [data-mark]');
 chosenMark.dispatchEvent(new w.Event('pointerover', { bubbles: true }));
 const removeButton = q('[data-pron-remove-floating]'); assert(removeButton && !removeButton.hidden);
+assert.equal(removeButton.parentElement, d.body, 'viewport-positioned removal lives outside the animated app shell');
+let geometryReads = 0;
+let fragmentRects = [
+  { top: 200, right: 300, bottom: 225, left: 250, width: 50, height: 25 },
+  { top: 500, right: 120, bottom: 525, left: 50, width: 70, height: 25 }
+];
+chosenMark.getClientRects = () => { geometryReads++; return fragmentRects; };
+pointer(chosenMark, 'pointerover', { clientX: 70, clientY: 510 });
+assert.equal(removeButton.style.left, '111px'); assert.equal(removeButton.style.top, '485px', 'wrapped mark uses the hovered line');
+pointer(chosenMark, 'pointerover', { clientX: 48, clientY: 510 }); assert(!removeButton.hidden, '2px outer hover allowance remains active');
+pointer(chosenMark, 'pointerover', { clientX: 47, clientY: 510 }); assert(removeButton.hidden, 'beyond the allowance does not retain a stale mark');
+pointer(chosenMark, 'pointerover', { clientX: 200, clientY: 350 }); assert(removeButton.hidden, 'blank space between wrapped fragments is inactive');
+pointer(chosenMark, 'pointerover', { clientX: 270, clientY: 210 });
+await new Promise(resolve => w.requestAnimationFrame(resolve)); geometryReads = 0;
+for (let i = 0; i < 20; i++) pointer(chosenMark, 'pointermove', { clientX: 270 + i / 10, clientY: 210 });
+await new Promise(resolve => w.requestAnimationFrame(resolve));
+assert.equal(geometryReads, 1, 'pointer movement measures one hovered mark once per frame');
+fragmentRects = fragmentRects.map(rect => ({ ...rect, top: rect.top - 100, bottom: rect.bottom - 100 }));
+w.dispatchEvent(new w.Event('scroll'));
+await new Promise(resolve => w.requestAnimationFrame(resolve)); assert(removeButton.hidden, 'scrolling away hides an obsolete hover position');
+fragmentRects = fragmentRects.map(rect => ({ ...rect, top: rect.top + 100, bottom: rect.bottom + 100 }));
+const duplicateMark = chosenMark.cloneNode(true); q('.material').appendChild(duplicateMark);
+duplicateMark.getClientRects = () => [{ top: 600, right: 400, bottom: 625, left: 350, width: 50, height: 25 }];
+pointer(duplicateMark, 'pointerover', { clientX: 375, clientY: 610 });
+assert.equal(removeButton.style.left, '391px'); assert.equal(removeButton.style.top, '585px', 'repeated mark IDs use the actual hovered element');
+duplicateMark.remove(); chosenMark.dispatchEvent(new w.Event('pointerover', { bubbles: true }));
 const removedId = removeButton.dataset.markId, removedMark = marks().find(a => a.id === removedId);
 assert.equal(removeButton.textContent, '×'); assert(!removeButton.closest('[data-annotatable]'));
 tap(removeButton); assert(!marks().some(a => a.id === removedId)); assert.equal(first().textContent, beforeRemovalText);

@@ -31,6 +31,9 @@
 @media(hover:hover){.pron-word:hover{background:#f7dce3;box-shadow:0 0 0 2px #f7dce3}}
 .pron-word:focus-visible{outline:2px solid #a44960;outline-offset:3px;background:#fbe3e9}.marking-words ::selection{background:#e9b3c1;color:#42232c}
 .pronunciation-mark{background:#f9e0e5;border:0;border-bottom:2px solid #d58a9c;color:inherit;padding:1px 0;border-radius:2px;box-decoration-break:clone;-webkit-box-decoration-break:clone;cursor:pointer}
+/* Transparent padding extends each inline fragment 2px past the mark's padding/border.
+   Negative horizontal margins preserve text width; vertical inline padding does not move lines. */
+.pronunciation-mark>.pron-mark-hit{display:inline;position:relative;z-index:1;font:inherit;color:inherit;padding:3px 2px 5px;margin:0 -2px;box-decoration-break:clone;-webkit-box-decoration-break:clone}
 .pronunciation-mark.active-mark{background:#f5cbd5;border-bottom-color:#a64d66;outline:1px solid #d894a6;outline-offset:1px}.pronunciation-mark.practiced{background:#e6efdd;border-bottom-color:#a2bd84}.pronunciation-mark.practiced.active-mark{outline-color:#769563}.pronunciation-mark:focus-visible{outline:2px solid #a44960;outline-offset:3px}
 .pron-remove-floating{position:fixed;z-index:3;width:26px;height:26px;padding:0;display:grid;place-items:center;border-radius:50%;border:1px solid #e5ccd3;background:#fff;color:#875064;font:500 19px/1 sans-serif;box-shadow:0 2px 6px #582d3d24;user-select:none;touch-action:manipulation}.pron-remove-floating:hover{background:#fff2f5;color:#572134;border-color:#c88b9d}.pron-remove-floating[hidden]{display:none}
 .pron-selection{margin:12px 0;padding:12px;border:1px solid #dca0af;border-radius:8px;background:#fff}.pron-selection p{font-size:14px;line-height:1.6;margin:0 0 10px;max-height:80px;overflow:auto}.pron-selection button{width:100%;background:#874356;color:white;border-radius:6px;padding:10px;font-size:14px}

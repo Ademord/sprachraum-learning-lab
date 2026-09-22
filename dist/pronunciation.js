@@ -5,7 +5,7 @@
   let context = '', marking = false, panel = false, active = null, lastPage = '', undo = null;
   let pointer = null, dragging = false, suppressClick = false, keyboardStart = null, hovered = null;
   const rendered = new WeakMap();
-  let paintPending = false, positionFrame = null;
+  let paintPending = false, positionFrame = null, layoutObserver = null, observedShell = null;
   const teacher = () => state?.presentation?.role === 'teacher';
   const visible = () => teacher() || !!state?.presentation?.showMarks;
   const words = value => [...value.matchAll(/[\p{L}\p{M}\p{N}]+(?:[’'–-][\p{L}\p{M}\p{N}]+)*/gu)].map(m => ({ start: m.index, end: m.index + m[0].length, text: m[0] }));
@@ -35,7 +35,7 @@
       const covering = marks.filter(a => a.start <= start && a.end >= cuts[i + 1]);
       const mark = covering.find(a => a.id === active) || covering[0];
       const segment = wordHTML(clean, start, cuts[i + 1]);
-      return mark ? `<mark role="button" tabindex="${teacher() && marking ? '-1' : '0'}" class="pronunciation-mark ${state.practiced[mark.id] ? 'practiced' : ''} ${mark.id === active && panel ? 'active-mark' : ''}" data-mark="${esc(mark.id)}" aria-label="${esc(mark.quote)}. ${state.practiced[mark.id] ? 'Practised. ' : ''}Open pronunciation note">${segment}</mark>` : segment;
+      return mark ? `<mark role="button" tabindex="${teacher() && marking ? '-1' : '0'}" class="pronunciation-mark ${state.practiced[mark.id] ? 'practiced' : ''} ${mark.id === active && panel ? 'active-mark' : ''}" data-mark="${esc(mark.id)}" aria-label="${esc(mark.quote)}. ${state.practiced[mark.id] ? 'Practised. ' : ''}Open pronunciation note"><span class="pron-mark-hit">${segment}</span></mark>` : segment;
     }).join('');
   }
   function paint() {
@@ -159,8 +159,10 @@
     if (nextFocus) nextFocus.focus({ preventScroll: true });
   }
   function mount() {
-    if (!state || view !== 'session') return;
+    if (!state || view !== 'session') { reset(); return; }
     ensure();
+    const shell = document.querySelector('.app-shell');
+    if (layoutObserver && shell !== observedShell) { layoutObserver.disconnect(); observedShell = shell; if (shell) { layoutObserver.observe(shell); const material = shell.querySelector('.material'); if (material) layoutObserver.observe(material); } }
     const page = key();
     if (lastPage !== page) { if (!state.annotations.some(a => a.id === active && a.pageId === page)) active = ordered().find(a => a.pageId === page)?.id || null; lastPage = page; keyboardStart = null; pointer = null; dragging = false; root.getSelection?.()?.removeAllRanges(); }
     const grid = document.querySelector('.canvas-grid');
@@ -212,9 +214,13 @@
   }
   function positionRemove() {
     let button = document.querySelector('[data-pron-remove-floating]');
-    const id = hovered;
-    const mark = id && [...document.querySelectorAll('.material [data-mark]')].find(el => el.dataset.mark === id);
-    const rect = mark?.getClientRects()[0];
+    const id = hovered?.id;
+    const mark = hovered?.element?.isConnected ? hovered.element : id && [...document.querySelectorAll('.material [data-mark]')].find(el => el.dataset.mark === id);
+    const rects = mark ? [...mark.getClientRects()] : [];
+    // Inline marks can wrap, or occur more than once on a page. Anchor to the
+    // actual hovered fragment, not the first rectangle with the same mark ID.
+    const point = hovered?.point;
+    const rect = point ? rects.find(r => point.x >= r.left - 2 && point.x <= r.right + 2 && point.y >= r.top - 2 && point.y <= r.bottom + 2) : rects[0];
     if (!state || view !== 'session' || !teacher() || drawer || dragging || root.getSelection?.()?.toString() || !rect || !rect.width || rect.bottom < 20 || rect.top > root.innerHeight - 20 || mark.closest('details:not([open])')) { if (button && !button.hidden) button.hidden = true; return; }
     if (!button) {
       button = document.createElement('button'); button.className = 'pron-remove-floating'; button.type = 'button'; button.dataset.pronRemoveFloating = '';
@@ -222,7 +228,9 @@
       button.onclick = e => { e.stopPropagation(); removeMark(button.dataset.markId); };
       button.onpointerdown = e => { e.stopPropagation(); pointer = null; dragging = false; };
       button.onpointerleave = () => { hovered = null; positionRemove(); };
-      document.querySelector('.app-shell').appendChild(button);
+      // The animated app shell has a transform, which changes the containing
+      // block of fixed descendants. Viewport coordinates belong at body level.
+      document.body.appendChild(button);
     }
     button.dataset.markId = id; button.hidden = false;
     button.setAttribute('aria-label', `Remove pronunciation mark: ${state.annotations.find(a => a.id === id)?.quote || ''}`);
@@ -257,8 +265,20 @@
     const button = box.querySelector('button'); button.onpointerdown = e => e.preventDefault(); button.onclick = () => { suppressClick = false; add(anchors); };
   }
   function init() {
+    if (root.ResizeObserver) layoutObserver = new root.ResizeObserver(schedulePositionRemove);
+    document.fonts?.addEventListener?.('loadingdone', schedulePositionRemove);
+    document.addEventListener('toggle', schedulePositionRemove, true);
+    document.addEventListener('animationend', schedulePositionRemove);
     document.addEventListener('pointerdown', e => { pointer = null; dragging = false; if ((e.button === undefined || e.button === 0) && e.target.closest('[data-annotatable]') && teacher() && marking && !drawer) { pointer = { x: e.clientX, y: e.clientY, type: e.pointerType }; dragging = true; suppressClick = false; positionRemove(); } });
-    document.addEventListener('pointerover', e => { const mark = e.target.closest('.material [data-mark]'); if (mark && teacher() && e.pointerType !== 'touch') { hovered = mark.dataset.mark; positionRemove(); } });
+    const trackHover = e => {
+      const mark = e.target.closest('.material [data-mark]');
+      if (mark && teacher() && e.pointerType !== 'touch') {
+        hovered = { id: mark.dataset.mark, element: mark, point: Number.isFinite(e.clientX) && Number.isFinite(e.clientY) ? { x: e.clientX, y: e.clientY } : null };
+        if (e.type === 'pointerover') positionRemove(); else schedulePositionRemove();
+      }
+    };
+    document.addEventListener('pointerover', trackHover);
+    document.addEventListener('pointermove', trackHover, { passive: true });
     document.addEventListener('pointerout', e => { if (e.target.closest('.material [data-mark]') && !e.relatedTarget?.closest?.('[data-pron-remove-floating],.material [data-mark]')) { hovered = null; positionRemove(); } });
     root.addEventListener('scroll', schedulePositionRemove, true); root.addEventListener('resize', schedulePositionRemove);
     document.addEventListener('pointerup', e => {
@@ -306,6 +326,6 @@
     });
     document.addEventListener('focusout', e => { if (e.target.closest('[data-pron-rail]')) setTimeout(() => refresh(), 0); });
   }
-  function reset() { context = ''; active = null; hovered = null; lastPage = ''; undo = null; dragging = false; pointer = null; suppressClick = false; keyboardStart = null; paintPending = false; if (positionFrame !== null) root.cancelAnimationFrame(positionFrame); positionFrame = null; document.querySelector('[data-pron-remove-floating]')?.remove(); }
+  function reset() { context = ''; active = null; hovered = null; lastPage = ''; undo = null; dragging = false; pointer = null; suppressClick = false; keyboardStart = null; paintPending = false; if (positionFrame !== null) root.cancelAnimationFrame(positionFrame); positionFrame = null; layoutObserver?.disconnect(); observedShell = null; document.querySelector('[data-pron-remove-floating]')?.remove(); }
   root.PRONUNCIATION = { controls, html, paint, mount, open, reset, init, selectionAnchors, positionRemove };
 })(window);
