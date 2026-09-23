@@ -36,3 +36,15 @@
   .app-shell .topbar .mark{width:22px;height:24px}
   .app-shell .role-label{font-size:11px}
 }
+
+.header-actions [data-notes]{display:inline-flex;align-items:center;gap:7px}
+.notebook-sync{display:inline-flex;align-items:center}
+.notebook-sync[hidden]{display:none}
+.notebook-sync-dot{width:7px;height:7px;border-radius:50%;background:#477760}
+.notebook-sync.pending .notebook-sync-dot{background:#99732b}
+.notebook-sync.offline .notebook-sync-dot,.notebook-sync.blocked .notebook-sync-dot,.notebook-sync.conflict .notebook-sync-dot{background:#ae553e}
+.notebook-sections{display:flex;gap:22px;border-bottom:1px solid var(--line);margin:0 0 22px}
+.notebook-sections button{position:relative;padding:12px 0;font-size:14px;color:var(--muted)}
+.notebook-sections button[aria-current=page]{color:var(--green);font-weight:600}
+.notebook-sections button[aria-current=page]:after{content:'';position:absolute;height:2px;left:0;right:0;bottom:-1px;background:var(--green)}
+.notebook-sections button:hover{color:var(--ink)}

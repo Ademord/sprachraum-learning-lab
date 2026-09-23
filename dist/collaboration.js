@@ -38,7 +38,21 @@
   }
   function toolbar() {
     ensure();
-    return `<div class="lesson-tools"><div class="view-controls">${PRONUNCIATION.controls()}</div><button class="secondary" data-live>${state.live ? 'Shared session' : 'With my teacher'}</button><p class="sync-state ${esc(status.kind)}" data-sync-status role="status">${state.live ? esc(status.text || 'Connecting…') : 'On this device'}</p></div>`;
+    return `<div class="lesson-tools"><div class="view-controls">${PRONUNCIATION.controls()}</div></div>`;
+  }
+  const syncDescription = () => 'Shared session: ' + (status.text || 'Connecting…');
+  function notebookStatus() {
+    return `<span class="notebook-sync ${esc(status.kind)}" data-notebook-sync ${state?.live ? '' : 'hidden'} title="${esc(syncDescription())}"><span aria-hidden="true" class="notebook-sync-dot"></span><span class="sr-only" data-notebook-status-text role="status">${state?.live ? esc(syncDescription()) : ''}</span></span>`;
+  }
+  function updateNotebookStatus() {
+    document.querySelectorAll('[data-notebook-sync]').forEach(el => {
+      const hidden = !state?.live, name = 'notebook-sync ' + (status.kind || ''), description = syncDescription();
+      if (el.hidden !== hidden) el.hidden = hidden;
+      if (el.className !== name) el.className = name;
+      if (el.title !== description) el.title = description;
+      const text = el.querySelector('[data-notebook-status-text]'), value = hidden ? '' : description;
+      if (text && text.textContent !== value) text.textContent = value;
+    });
   }
   const markedHTML = (...args) => PRONUNCIATION.html(...args);
   function text(text, block, pageId = key()) { return `<span class="annotatable" data-annotatable data-page-id="${esc(pageId)}" data-block="${esc(block)}">${markedHTML(text, pageId, block)}</span>`; }
@@ -80,6 +94,7 @@
   function setStatus(next) {
     if (!storageOK && next.pending) next = { ...next, text: next.text + ' Browser storage is unavailable; keep this tab open or export a backup.' };
     status = next;
+    updateNotebookStatus();
     document.querySelectorAll('[data-sync-status]').forEach(el => { if (el.textContent !== next.text) el.textContent = next.text; const name = 'sync-state ' + (next.kind || ''); if (el.className !== name) el.className = name; });
     if (drawer === 'live' && (next.kind === 'conflict' || next.kind === 'blocked')) openDrawer('live');
   }
@@ -176,6 +191,7 @@
     const heading=document.querySelector('[data-heading]'),toggle=document.querySelector('[data-heading-toggle]');
     if(heading&&toggle){let pinned=false;const expand=value=>{heading.querySelectorAll('[data-heading-detail]').forEach(el=>el.hidden=!value);toggle.setAttribute('aria-expanded',String(value));heading.classList.toggle('expanded',value);};heading.onpointerenter=e=>{if(e.pointerType!=='touch')expand(true)};heading.onpointerleave=()=>{if(!pinned&&!heading.contains(document.activeElement))expand(false)};toggle.onfocus=()=>expand(true);toggle.onclick=()=>{pinned=!pinned;expand(pinned)};heading.onfocusout=()=>setTimeout(()=>{if(!pinned&&!heading.contains(document.activeElement))expand(false)},0);heading.onkeydown=e=>{if(e.key==='Escape'){pinned=false;expand(false)}};}
     all('[data-backup]', () => downloadBackup()); all('[data-feedback]', () => PRONUNCIATION.open());
+    all('[data-notebook-section]', el => { const section = el.dataset.notebookSection; openDrawer(section); document.querySelector(`[data-notebook-section="${section}"]`)?.focus({ preventScroll: true }); });
     all('[data-live]', () => openDrawer('live')); all('[data-create-live]', createRoom);
     all('[data-open-session]', el => openSession(el.dataset.openSession));
     const viewToggle = document.querySelector('[data-view]'); if (viewToggle) viewToggle.onclick = () => { if (state.live?.role === 'teacher') return; ensure(); state.presentation.role = canTeach() ? 'learner' : 'teacher'; persist(); render(); document.querySelector('[data-view]')?.focus({ preventScroll: true }); };
@@ -197,5 +213,5 @@
     else invitation = pendingInvitation();
     if (invitation) { openDrawer('live'); openRoom(invitation.id, invitation.token); }
   }
-  root.COLLAB = { ensure, roleControl, toolbar, text, referencePage, selectionAnchor, paintMarks, liveBody, cloudRooms, bind, init, changed, beforeLeave, reconnect, backup, restore, downloadBackup, sourceFor, capture, openRoom, createRoom, syncNow: async () => { capture(); await client?.tick(); } };
+  root.COLLAB = { ensure, roleControl, toolbar, notebookStatus, text, referencePage, selectionAnchor, paintMarks, liveBody, cloudRooms, bind, init, changed, beforeLeave, reconnect, backup, restore, downloadBackup, sourceFor, capture, openRoom, createRoom, syncNow: async () => { capture(); await client?.tick(); } };
 })(window);
