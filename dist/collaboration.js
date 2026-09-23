@@ -12,6 +12,7 @@
   function forgetInvitation() { invitation = null; try { sessionStorage.removeItem(pendingInviteKey); } catch {} }
   const role = () => state?.presentation?.role || 'learner';
   const canTeach = () => role() === 'teacher';
+  const boundHeadings = new WeakSet();
   function ensure(s = state) {
     if (!s) return;
     s.annotations ||= []; s.practiced ||= {}; s.teacherNotes ||= ''; s.presentation ||= { role: 'learner', showMarks: false };
@@ -189,7 +190,24 @@
   function bind() {
     const all = (sel, fn) => document.querySelectorAll(sel).forEach(el => el.onclick = () => fn(el));
     const heading=document.querySelector('[data-heading]'),toggle=document.querySelector('[data-heading-toggle]');
-    if(heading&&toggle){let pinned=false;const expand=value=>{heading.querySelectorAll('[data-heading-detail]').forEach(el=>el.hidden=!value);toggle.setAttribute('aria-expanded',String(value));heading.classList.toggle('expanded',value);};heading.onpointerenter=e=>{if(e.pointerType!=='touch')expand(true)};heading.onpointerleave=()=>{if(!pinned&&!heading.contains(document.activeElement))expand(false)};toggle.onfocus=()=>expand(true);toggle.onclick=()=>{pinned=!pinned;expand(pinned)};heading.onfocusout=()=>setTimeout(()=>{if(!pinned&&!heading.contains(document.activeElement))expand(false)},0);heading.onkeydown=e=>{if(e.key==='Escape'){pinned=false;expand(false)}};}
+    if (heading && toggle && !boundHeadings.has(heading)) {
+      boundHeadings.add(heading);
+      let pinned = false, hoverTimer, leaveTimer;
+      const cancel = () => { clearTimeout(hoverTimer); clearTimeout(leaveTimer); };
+      const expand = value => {
+        if (!heading.isConnected) return;
+        heading.querySelectorAll('[data-heading-detail]').forEach(el => el.setAttribute('aria-hidden', String(!value)));
+        toggle.setAttribute('aria-expanded', String(value));
+        heading.classList.toggle('expanded', value);
+      };
+      const settle = () => { cancel(); leaveTimer = setTimeout(() => { if (!pinned && !heading.contains(document.activeElement)) expand(false); }, 220); };
+      heading.onpointerenter = e => { if (e.pointerType === 'touch') return; cancel(); hoverTimer = setTimeout(() => expand(true), 140); };
+      heading.onpointerleave = settle;
+      toggle.onfocus = () => { cancel(); expand(true); };
+      toggle.onclick = () => { cancel(); pinned = !pinned; expand(pinned); };
+      heading.onfocusout = settle;
+      heading.onkeydown = e => { if (e.key === 'Escape') { cancel(); pinned = false; expand(false); } };
+    }
     all('[data-backup]', () => downloadBackup()); all('[data-feedback]', () => PRONUNCIATION.open());
     all('[data-notebook-section]', el => { const section = el.dataset.notebookSection; if (section === drawer) return; openDrawer(section); el.focus({ preventScroll: true }); });
     all('[data-live]', () => openDrawer('live')); all('[data-create-live]', createRoom);
