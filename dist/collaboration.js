@@ -32,9 +32,13 @@
     sessions[id] = IO.importState(checked.session, LESSONS[lessonId], checked.packet, id, lessonId);
     openSession(id); return id;
   }
+  function roleControl() {
+    ensure();
+    return `<div class="role-control"><span class="role-label ${!canTeach() ? 'current' : ''}">Learner</span><button type="button" class="role-switch" role="switch" data-view aria-label="Teacher view" aria-checked="${canTeach()}" ${state.live?.role === 'teacher' ? 'disabled title="This shared session is assigned to you as the teacher"' : ''}><span aria-hidden="true"></span></button><span class="role-label ${canTeach() ? 'current' : ''}">Teacher</span></div>`;
+  }
   function toolbar() {
     ensure();
-    return `<div class="lesson-tools"><div class="view-controls"><div class="role-control"><span class="role-label ${!canTeach() ? 'current' : ''}">Learner</span><button type="button" class="role-switch" role="switch" data-view aria-label="Teacher view" aria-checked="${canTeach()}" ${state.live?.role === 'teacher' ? 'disabled title="This shared session is assigned to you as the teacher"' : ''}><span aria-hidden="true"></span></button><span class="role-label ${canTeach() ? 'current' : ''}">Teacher</span></div>${PRONUNCIATION.controls()}</div>${LESSON_WIDTH.toolbar()}<button class="secondary" data-live>${state.live ? 'Shared session' : 'With my teacher'}</button><p class="sync-state ${esc(status.kind)}" data-sync-status role="status">${state.live ? esc(status.text || 'Connecting…') : 'On this device'}</p></div>`;
+    return `<div class="lesson-tools"><div class="view-controls">${PRONUNCIATION.controls()}</div><button class="secondary" data-live>${state.live ? 'Shared session' : 'With my teacher'}</button><p class="sync-state ${esc(status.kind)}" data-sync-status role="status">${state.live ? esc(status.text || 'Connecting…') : 'On this device'}</p></div>`;
   }
   const markedHTML = (...args) => PRONUNCIATION.html(...args);
   function text(text, block, pageId = key()) { return `<span class="annotatable" data-annotatable data-page-id="${esc(pageId)}" data-block="${esc(block)}">${markedHTML(text, pageId, block)}</span>`; }
@@ -193,5 +197,5 @@
     else invitation = pendingInvitation();
     if (invitation) { openDrawer('live'); openRoom(invitation.id, invitation.token); }
   }
-  root.COLLAB = { ensure, toolbar, text, referencePage, selectionAnchor, paintMarks, liveBody, cloudRooms, bind, init, changed, beforeLeave, reconnect, backup, restore, downloadBackup, sourceFor, capture, openRoom, createRoom, syncNow: async () => { capture(); await client?.tick(); } };
+  root.COLLAB = { ensure, roleControl, toolbar, text, referencePage, selectionAnchor, paintMarks, liveBody, cloudRooms, bind, init, changed, beforeLeave, reconnect, backup, restore, downloadBackup, sourceFor, capture, openRoom, createRoom, syncNow: async () => { capture(); await client?.tick(); } };
 })(window);

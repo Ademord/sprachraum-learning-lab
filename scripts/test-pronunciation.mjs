@@ -133,5 +133,14 @@ w.innerWidth = 1800; w.dispatchEvent(new w.Event('resize')); assert.equal(q('[da
 key(q('[data-width-reset]'), 'ArrowDown', { code: 'ArrowDown', ctrlKey: true, altKey: true });
 assert.equal(w.localStorage.getItem('sprachraum.lesson-width.v1'), null); assert.equal(d.documentElement.style.getPropertyValue('--lesson-width'), '');
 assert(q('[data-width-reset]').disabled); assert(!JSON.stringify(w.COLLAB.backup()).includes('lesson-width'));
+// A reset disables its button; keep keyboard focus in the menu so Escape can close it.
+const widthMenu = q('[data-width-menu]'), widthSummary = widthMenu.querySelector('summary');
+widthMenu.open = true;
+tap(q('[data-width-narrow]'));
+q('[data-width-reset]').focus(); tap(q('[data-width-reset]'));
+assert.equal(d.activeElement, widthSummary); assert(widthMenu.open);
+key(widthSummary, 'Escape'); assert(!widthMenu.open); assert.equal(d.activeElement, widthSummary);
+widthMenu.open = true;
+q('[data-view]').focus(); assert(!widthMenu.open);
 dom.window.close();
 console.log('Pronunciation: selection, review, inline removal/undo and exact anchors passed. Width: controls, keyboard isolation, saved preference, viewport clamp and reset passed.');

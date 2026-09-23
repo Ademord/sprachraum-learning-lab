@@ -8,9 +8,10 @@
   const clamp = value => Math.round(Math.min(viewport(), Math.max(Math.min(minimum, viewport()), value)));
   const current = () => clamp(preference ?? stock);
   function toolbar() {
-    return `<div class="width-controls" role="group" aria-label="Lesson width"><span>Width</span><button type="button" data-width-narrow aria-label="Narrower lesson" aria-keyshortcuts="Control+Alt+ArrowLeft" title="Narrower · Ctrl+Alt+← · Shift-click for a larger step">−</button><output data-width-label aria-live="polite">${current()} px</output><button type="button" data-width-wider aria-label="Wider lesson" aria-keyshortcuts="Control+Alt+ArrowRight" title="Wider · Ctrl+Alt+→ · Shift-click for a larger step">+</button><button type="button" data-width-reset aria-keyshortcuts="Control+Alt+ArrowDown" title="Default width · Ctrl+Alt+↓">Reset</button></div>`;
+    return `<details class="width-menu" data-width-menu><summary><span aria-hidden="true">↔</span> Width</summary><div class="width-panel"><div class="width-panel-title">Lesson width</div><div class="width-controls" role="group" aria-label="Lesson width"><button type="button" data-width-narrow aria-label="Narrower lesson" aria-keyshortcuts="Control+Alt+ArrowLeft" title="Narrower · Ctrl+Alt+← · Shift-click for a larger step">−</button><output data-width-label aria-live="polite">${current()} px</output><button type="button" data-width-wider aria-label="Wider lesson" aria-keyshortcuts="Control+Alt+ArrowRight" title="Wider · Ctrl+Alt+→ · Shift-click for a larger step">+</button><button type="button" data-width-reset aria-keyshortcuts="Control+Alt+ArrowDown" title="Default width · Ctrl+Alt+↓">Reset</button></div><p class="width-shortcut">Ctrl + Alt + ← / →</p></div></details>`;
   }
   function apply() {
+    const focused = document.activeElement;
     const style = document.documentElement.style;
     if (preference === null) { style.removeProperty('--lesson-width'); document.documentElement.removeAttribute('data-custom-width'); }
     else { style.setProperty('--lesson-width', current() + 'px'); document.documentElement.setAttribute('data-custom-width', ''); }
@@ -18,6 +19,7 @@
     document.querySelectorAll('[data-width-narrow]').forEach(el => el.disabled = current() <= Math.min(minimum, viewport()));
     document.querySelectorAll('[data-width-wider]').forEach(el => el.disabled = current() >= viewport());
     document.querySelectorAll('[data-width-reset]').forEach(el => el.disabled = preference === null);
+    if (focused?.disabled && focused.closest?.('[data-width-menu]')) focused.closest('[data-width-menu]').querySelector('summary')?.focus({ preventScroll: true });
     root.PRONUNCIATION?.positionRemove();
   }
   function change(delta, large = false) {
@@ -31,6 +33,11 @@
     document.querySelectorAll('[data-width-narrow]').forEach(el => el.onclick = e => change(-1, e.shiftKey));
     document.querySelectorAll('[data-width-wider]').forEach(el => el.onclick = e => change(1, e.shiftKey));
     document.querySelectorAll('[data-width-reset]').forEach(el => el.onclick = reset);
+    document.querySelectorAll('[data-width-menu]').forEach(el => el.onkeydown = e => {
+      if (e.key !== 'Escape' || !el.open) return;
+      e.preventDefault(); e.stopPropagation(); el.open = false;
+      el.querySelector('summary')?.focus({ preventScroll: true });
+    });
   }
   function init() {
     document.addEventListener('keydown', e => {
@@ -40,6 +47,11 @@
       e.preventDefault(); e.stopPropagation();
     }, true);
     root.addEventListener('resize', apply);
+    const dismiss = e => document.querySelectorAll('[data-width-menu][open]').forEach(el => {
+      if (!el.contains(e.target)) el.open = false;
+    });
+    document.addEventListener('pointerdown', dismiss);
+    document.addEventListener('focusin', dismiss);
   }
   root.LESSON_WIDTH = { toolbar, mount, init };
 })(window);

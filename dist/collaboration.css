@@ -5,3 +5,34 @@
 [data-custom-width] .app-shell .reading{max-width:none}
 .width-controls{display:flex;align-items:center;gap:3px;padding:4px 6px;border:1px solid var(--line);border-radius:9px;background:#fff;font-size:13px;white-space:nowrap}.width-controls>span{padding:0 7px 0 3px;color:var(--muted)}.width-controls button{min-width:30px;min-height:32px;padding:4px 7px;border-radius:6px;font-size:16px}.width-controls button:hover{background:#edf2ef}.width-controls output{min-width:62px;text-align:center;font-size:13px;font-variant-numeric:tabular-nums;color:var(--muted)}.width-controls [data-width-reset]{font-size:13px;border-left:1px solid var(--line);border-radius:0;margin-left:4px;padding-left:10px}
 @media(max-width:680px){.width-controls{margin-right:auto}.width-controls button{min-height:36px}}
+
+/* Keep account-level viewing controls in the header and reading preferences quiet. */
+.app-shell .topbar{height:auto;min-height:72px;padding-top:10px;padding-bottom:10px}
+.app-shell .header-actions{margin-left:auto;justify-content:flex-end}
+.app-shell .topbar>.role-control{flex-shrink:0;border-left:1px solid var(--line);padding-left:20px}
+.below{align-items:center;flex-wrap:wrap}
+.lesson-footer-tools{position:relative;display:flex;align-items:center;gap:24px;margin-left:auto;flex-shrink:0}
+.width-menu summary{display:flex;align-items:center;gap:6px;padding:7px 9px;border-radius:6px;list-style:none;cursor:pointer;font-size:12px;color:var(--muted);user-select:none}
+.width-menu summary::-webkit-details-marker{display:none}
+.width-menu summary>span{font-size:17px;line-height:1}
+.width-menu summary:hover,.width-menu[open] summary{background:#e9eee9;color:var(--ink)}
+.width-menu summary:focus-visible{outline:3px solid #658b39;outline-offset:3px}
+.width-panel{position:absolute;right:0;bottom:calc(100% + 8px);width:264px;max-width:calc(100vw - 32px);padding:16px;background:#fff;border:1px solid var(--line);border-radius:12px;box-shadow:0 8px 28px #213b3618;z-index:4}
+.width-panel-title{font-size:13px;font-weight:600;color:var(--ink);margin-bottom:10px}
+.width-panel .width-controls{justify-content:space-between;margin:0}
+.width-shortcut{margin:10px 0 0;font-size:11px;color:var(--muted);text-align:center}
+@media(max-width:680px){
+  .app-shell .topbar{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:5px 12px;padding:12px 16px}
+  .app-shell .topbar>.brand{grid-column:1;grid-row:1;font-size:20px;gap:6px}
+  .app-shell .topbar .mark{width:25px;height:27px;flex-shrink:0}
+  .app-shell .topbar>.role-control{grid-column:2;grid-row:1;padding:0;border:0;gap:6px}
+  .app-shell .role-label{font-size:12px}
+  .app-shell .header-actions{grid-column:1/-1;grid-row:2;justify-self:end}
+  .app-shell .header-actions .new-label{display:inline}
+}
+@media(max-width:380px){
+  .app-shell .topbar{padding-left:12px;padding-right:12px;column-gap:8px}
+  .app-shell .topbar>.brand{font-size:17px;gap:5px}
+  .app-shell .topbar .mark{width:22px;height:24px}
+  .app-shell .role-label{font-size:11px}
+}
