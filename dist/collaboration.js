@@ -191,7 +191,7 @@
     const heading=document.querySelector('[data-heading]'),toggle=document.querySelector('[data-heading-toggle]');
     if(heading&&toggle){let pinned=false;const expand=value=>{heading.querySelectorAll('[data-heading-detail]').forEach(el=>el.hidden=!value);toggle.setAttribute('aria-expanded',String(value));heading.classList.toggle('expanded',value);};heading.onpointerenter=e=>{if(e.pointerType!=='touch')expand(true)};heading.onpointerleave=()=>{if(!pinned&&!heading.contains(document.activeElement))expand(false)};toggle.onfocus=()=>expand(true);toggle.onclick=()=>{pinned=!pinned;expand(pinned)};heading.onfocusout=()=>setTimeout(()=>{if(!pinned&&!heading.contains(document.activeElement))expand(false)},0);heading.onkeydown=e=>{if(e.key==='Escape'){pinned=false;expand(false)}};}
     all('[data-backup]', () => downloadBackup()); all('[data-feedback]', () => PRONUNCIATION.open());
-    all('[data-notebook-section]', el => { const section = el.dataset.notebookSection; openDrawer(section); document.querySelector(`[data-notebook-section="${section}"]`)?.focus({ preventScroll: true }); });
+    all('[data-notebook-section]', el => { const section = el.dataset.notebookSection; if (section === drawer) return; openDrawer(section); el.focus({ preventScroll: true }); });
     all('[data-live]', () => openDrawer('live')); all('[data-create-live]', createRoom);
     all('[data-open-session]', el => openSession(el.dataset.openSession));
     const viewToggle = document.querySelector('[data-view]'); if (viewToggle) viewToggle.onclick = () => { if (state.live?.role === 'teacher') return; ensure(); state.presentation.role = canTeach() ? 'learner' : 'teacher'; persist(); render(); document.querySelector('[data-view]')?.focus({ preventScroll: true }); };
